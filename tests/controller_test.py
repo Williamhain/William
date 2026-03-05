@@ -1,5 +1,3 @@
-# controller_test.py
-
 from unittest import TestCase
 from unittest import main
 from pos.controller import Controller
@@ -478,8 +476,6 @@ class ControllerTest(TestCase):
 
 Sale # 1
 
-Date of purchase: 2026-02-21
-
 -----------------------------------------------------------
 ITEM NAME                      -    QTY x   UNIT - SUBTOTAL
 
@@ -496,8 +492,6 @@ TOTAL SALE                                       -  11.18
 
 Sale # 2
 
-Date of purchase: 2026-02-21
-
 -----------------------------------------------------------
 ITEM NAME                      -    QTY x   UNIT - SUBTOTAL
 
@@ -513,8 +507,6 @@ TOTAL SALE                                       -  21.27
 '''MARKET AT VICTORIA - SALES RECEIPT
 
 Sale # 3
-
-Date of purchase: 2026-02-21
 
 -----------------------------------------------------------
 ITEM NAME                      -    QTY x   UNIT - SUBTOTAL
