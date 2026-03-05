@@ -1,1 +1,4 @@
-# sale.py
+# sale.py 
+
+class Sale:
+    pass
