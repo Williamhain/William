@@ -4,7 +4,7 @@ from pos.product import Product
 class Controller:
     def __init__(self):
         self._logged_in = False #set log-in flag initially to false (user is not logged in)
-        self._products = {} #UPO code for product
+        self._products = {} #creates an empty dictionary with the UPC code for the product as the key. So, _products will become a long lookup table list of products
 
     def logout(self):
         if not self._logged_in: #if not logged in, do nothing
@@ -35,3 +35,24 @@ class Controller:
     
     def search_product(self, upc): #search for a specific product by UPC
         return self._products.get(upc) #return the product if found, otherwise return None
+
+    def update_product(self, upc, updated_upc, updated_product_name, updated_price):
+        
+        if not self._logged_in: #do not allow user to update product if not logged in
+            return False
+        
+        if upc not in self._products: #do not allow user to update a product that doesn't exist
+            return False
+        
+        if updated_upc != upc and updated_upc in self._products: #if the updated upc is already found in the dictionary (and is not the same as the original upc) then we reject the update
+            return False 
+        
+        updated_product = Product(updated_upc, updated_product_name, updated_price) #create a new Product object with updated upc, product name, and price
+        self._products[updated_upc] = updated_product #store the updated product in the dictionary with the UPC as the key
+
+        if updated_upc != upc: #check if the upc was changed
+            del self._products[upc] #if the upc was changed, delete the original upc code
+
+        return True
+    
+
