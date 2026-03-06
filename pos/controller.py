@@ -25,7 +25,7 @@ class Controller:
     def create_product(self, upc, product_name, price):
         if not self._logged_in:
             return None #return None if not logged in
-        
+    
         if upc in self._products: #check if the product with the same UPC already exists
             return None #if the product already exists, do nothing and return None
         
@@ -34,18 +34,36 @@ class Controller:
         return product #function successfully completed, return the newly created product
     
     def search_product(self, upc): #search for a specific product by UPC
-        return self._products.get(upc) #return the product if found, otherwise return None
+        actual_product = self._products.get(upc)
+        return actual_product #return the product if found, otherwise return None
+
+    def retrieve_products(self, product_name):
+        
+        if not self._logged_in:
+            return None #do not allow user to search for a product if not logged in
+        
+        retrieved_list = []
+
+        for product in self._products.values(): #look through all products in the dictionary
+            if product_name in product.product_name: #check if the searched text is in the product's name
+                retrieved_list.append(product) #append the found product to the list
+
+        return retrieved_list 
 
     def update_product(self, upc, updated_upc, updated_product_name, updated_price):
         
         if not self._logged_in: #do not allow user to update product if not logged in
             return False
         
+        if self._products == {}:
+            return False #do not allow user to update product when the system has no products
+
         if upc not in self._products: #do not allow user to update a product that doesn't exist
             return False
         
-        if updated_upc != upc and updated_upc in self._products: #if the updated upc is already found in the dictionary (and is not the same as the original upc) then we reject the update
-            return False 
+        if updated_upc != upc:
+            if updated_upc in self._products: 
+                return False #if the updated upc is already found in the dictionary (and is not the same as the original upc) then we reject the update
         
         updated_product = Product(updated_upc, updated_product_name, updated_price) #create a new Product object with updated upc, product name, and price
         self._products[updated_upc] = updated_product #store the updated product in the dictionary with the UPC as the key
@@ -55,4 +73,33 @@ class Controller:
 
         return True
     
+    def delete_product(self, upc):
+
+        if not self._logged_in: 
+            return False #do not allow user to delete product if not logged in 
+        
+        if self._products == {}:
+            return False #the dictionary is empty, there are no products to delete
+            
+        del self._products[upc] #delete the specified product by UPC
+
+        return True
+    
+    def list_products(self):
+
+        if not self._logged_in:
+            return None #do not allow user to list the products if not logged in
+        
+        if len(self._products) == 0:
+            return [] #if the list is empty, return an empty list
+        
+        product_list = []
+
+        for product in self._products.values(): 
+            product_list.append(product) #add each product to the list
+
+        return product_list
+
+        
+
 
