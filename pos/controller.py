@@ -7,6 +7,7 @@ class Controller:
         self._logged_in = False #set log-in flag initially to false (user is not logged in)
         self._products = {} #creates an empty dictionary with the UPC code for the product as the key. So, _products will become a long lookup table list of products
         self._current_sale = None
+        self._sales = []
 
     def logout(self):
         if not self._logged_in: #if not logged in, do nothing
@@ -130,3 +131,27 @@ class Controller:
 
         self._current_sale = None
         return True
+    
+    #comments
+    def add_sale(self, sale):
+        self._sales.append(sale)
+
+    #comments
+    def search_sale(self, sale_id):
+
+        if not self._logged_in:
+            return None
+
+        for sale in self._sales:
+            if sale.sale_id == sale_id:
+                return sale
+
+        return None
+    
+    #comments
+    def list_sales(self):
+
+        if not self._logged_in:
+            return None
+
+        return self._sales
