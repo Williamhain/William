@@ -1,5 +1,6 @@
 # controller.py
 from pos.product import Product
+from pos.sale import Sale
 
 class Controller:
     def __init__(self):
@@ -100,6 +101,20 @@ class Controller:
 
         return product_list
 
+    #comments
+    def initiate_sale(self):
+        if not self._logged_in:
+            return False #do not allow user to make a sale if not logged in
         
+        if self._current_sale is not None:
+            return False #if there is already a sale being made, do not start another sale
+        
+        self._current_sale = Sale(None, None, 0.00, 0.00, 0.00, 0.00) #default current sale
+
+        return True
+    
+    #comments
+    def get_current_sale(self):
+        return self._current_sale    
 
 

@@ -1,4 +1,19 @@
 # sale.py 
-
 class Sale:
-    pass
+    
+    def _init_ (self, sale_id, sale_date, subtotal, gst, pst, total):
+        self.sale_id = sale_id
+        self.sale_date = sale_date
+        self.subtotal = subtotal
+        self.gst = gst
+        self.pst = pst
+        self.total = total 
+
+    #comment
+    def __eq__(self, other):
+        return (self.sale_id == other.sale_id and
+            self.sale_date == other.sale_date and
+            self.subtotal == other.subtotal and
+            self.gst == other.gst and
+            self.pst == other.pst and
+            self.total == other.total)
