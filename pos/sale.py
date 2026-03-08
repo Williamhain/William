@@ -1,7 +1,7 @@
 # sale.py 
 class Sale:
     
-    def _init_ (self, sale_id, sale_date, subtotal, gst, pst, total):
+    def __init__ (self, sale_id, sale_date, subtotal, gst, pst, total):
         self.sale_id = sale_id
         self.sale_date = sale_date
         self.subtotal = subtotal
