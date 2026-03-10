@@ -180,3 +180,17 @@ class Controller:
             if item.code == code:
                 return item
         return None
+    
+    #add a new sale line item to the current sale using a product UPC
+    def add_new_sale_line_item(self, quantity, upc): 
+        if not self._logged_in:
+            return None #do not allow to add a new item if user is not logged in
+        
+        if self._current_sale is None:
+            return None #do not allow to add a new item if there is no active current sale
+        
+        product = self.search_product(upc)
+        if product is None:
+            return None #if the product doesn't exist in the dictionary, return None
+        
+        return self.create_sale_line_item(quantity, product.price, upc) #add the created item from the create sale item method to the list of items in the current sale

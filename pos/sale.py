@@ -19,3 +19,6 @@ class Sale:
             self.gst == other.gst and
             self.pst == other.pst and
             self.total == other.total)
+    
+    def get_number_sale_line_items(self):
+        return len(self.line_items) #return the list of sale line items in current sale
