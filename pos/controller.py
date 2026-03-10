@@ -1,6 +1,7 @@
 # controller.py
 from pos.product import Product
 from pos.sale import Sale
+from pos.sale_line_item import SaleLineItem
 
 class Controller:
     def __init__(self):
@@ -155,3 +156,27 @@ class Controller:
             return None
 
         return self._sales
+    
+    def create_sale_line_item(self, quantity, price, upc):
+        if not self._logged_in or self._current_sale is None:
+            return None
+            
+        #get the auto-incremented code from the current sale
+        code = self._current_sale._item_counter
+        self._current_sale._item_counter += 1
+        
+        #create the item and add it to the current sale's list
+        new_item = SaleLineItem(code, quantity, price, upc)
+        self._current_sale.line_items.append(new_item)
+        
+        return new_item
+
+    def search_sale_line_item(self, code):
+        if not self._logged_in or self._current_sale is None:
+            return None
+            
+        #search through the current sale's line items
+        for item in self._current_sale.line_items:
+            if item.code == code:
+                return item
+        return None

@@ -8,6 +8,8 @@ class Sale:
         self.gst = gst
         self.pst = pst
         self.total = total 
+        self.line_items = []
+        self._item_counter = 1
 
     #comment
     def __eq__(self, other):
