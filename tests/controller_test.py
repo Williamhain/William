@@ -660,7 +660,6 @@ TOTAL SALE                                       -  42.40
 		# listing a sale line item from a singleton list
 		self.controller.add_new_sale_line_item(2, "037466022680")
 		sale_line_item_print = self.controller.print_sale_line_item(1)
-		self.assertIsNone(sale_line_item, "sale line item 1 cannot be none")
 		self.assertEqual(expected_sale_line_item_1_print, sale_line_item_print, "sale line item 1 is the printed sale line item.")
 
 		# add some more sale line items
@@ -669,11 +668,9 @@ TOTAL SALE                                       -  42.40
 
 		# listing a sale line item from a larger list
 		sale_line_item_print = self.controller.print_sale_line_item(3)
-		self.assertIsNone(sale_line_item, "sale line item 3 cannot be none")
 		self.assertEqual(expected_sale_line_item_3_print, sale_line_item_print, "sale line item 3 is the printed sale line item.")
 
 		sale_line_item_print = self.controller.print_sale_line_item(2)
-		self.assertIsNone(sale_line_item, "sale line item 2 cannot be none")
 		self.assertEqual(expected_sale_line_item_2_print, sale_line_item_print, "sale line item 2 is the printed sale line item.")
 
 
