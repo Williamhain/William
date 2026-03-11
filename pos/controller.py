@@ -2,6 +2,7 @@
 from pos.product import Product
 from pos.sale import Sale
 from pos.sale_line_item import SaleLineItem
+from datetime import datetime
 
 class Controller:
     def __init__(self):
@@ -9,6 +10,7 @@ class Controller:
         self._products = {} #creates an empty dictionary with the UPC code for the product as the key. So, _products will become a long lookup table list of products
         self._current_sale = None
         self._sales = []
+        self._sale_counter = 1
 
     def logout(self):
         if not self._logged_in: #if not logged in, do nothing
@@ -59,22 +61,21 @@ class Controller:
         if not self._logged_in: #do not allow user to update product if not logged in
             return False
         
-        if self._products == {}:
-            return False #do not allow user to update product when the system has no products
+        product = self.search_product(upc) #search for the product by upc
+        if product is None:
+            return False #product not found
 
-        if upc not in self._products: #do not allow user to update a product that doesn't exist
-            return False
-        
-        if updated_upc != upc:
+        if updated_upc != upc: 
             if updated_upc in self._products: 
                 return False #if the updated upc is already found in the dictionary (and is not the same as the original upc) then we reject the update
         
-        updated_product = Product(updated_upc, updated_product_name, updated_price) #create a new Product object with updated upc, product name, and price
-        self._products[updated_upc] = updated_product #store the updated product in the dictionary with the UPC as the key
+        if updated_upc != upc:
+            product = self._products.pop(upc) #remove the old UPC 
+            self._products[updated_upc] = product #store the product under the new UPC
 
-        if updated_upc != upc: #check if the upc was changed
-            del self._products[upc] #if the upc was changed, delete the original upc code
-
+        product.upc = updated_upc
+        product.product_name = updated_product_name
+        product.price = updated_price
         return True
     
     def delete_product(self, upc):
@@ -82,8 +83,8 @@ class Controller:
         if not self._logged_in: 
             return False #do not allow user to delete product if not logged in 
         
-        if self._products == {}:
-            return False #the dictionary is empty, there are no products to delete
+        if upc not in self._products:
+            return False #the product is not in the dictionary
             
         del self._products[upc] #delete the specified product by UPC
 
@@ -194,3 +195,38 @@ class Controller:
             return None #if the product doesn't exist in the dictionary, return None
         
         return self.create_sale_line_item(quantity, product.price, upc) #add the created item from the create sale item method to the list of items in the current sale
+    
+    def get_number_sales(self):
+        return len(self._sales) #return the number of sale objects in the list
+
+    def finish_current_sale(self):
+
+        if not self._logged_in:
+            return None #user can't finish a sale if they aren't logged in
+        
+        if self._current_sale is None:
+            return None #check if there is no current sale
+        
+        if self._current_sale.get_number_sale_line_items() == 0:
+            return None #can't complete a sale without any line items
+        
+        subtotal = 0
+
+        for item in self._current_sale.line_items: #loop through all sale line items
+            subtotal += item.quantity * item.price #increment subtotal by the quantity of the item multiplied by the price
+
+        subtotal = round(subtotal, 2) #round subtotal to 2 decimal places
+        gst = round(subtotal * 0.05, 2) #GST is 5%
+        pst = round(subtotal * 0.07, 2) #PST is 7%
+        total = round(subtotal + gst + pst, 2) #final total of sale
+
+        sale_id = len(self._sales) + 1 #track each sale made 
+        sale_date = datetime.now().date() #today's date
+        
+        finished_sale = Sale(sale_id, sale_date, subtotal, gst, pst, total) #create final sale object
+        self._sales.append(finished_sale) #add sale to list
+        self._current_sale = None #set current sale to none now that sale is completed
+        return finished_sale
+    
+
+
