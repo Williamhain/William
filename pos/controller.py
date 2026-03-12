@@ -228,5 +228,25 @@ class Controller:
         self._current_sale = None #set current sale to none now that sale is completed
         return finished_sale
     
+    def print_sale_line_item(self, code):
+
+        if not self._logged_in:
+            return None
+        
+        if self._current_sale is None:
+            return None #check if there is no current sale
+        
+        sale_line_item = self.search_sale_line_item(code) #look for the sale line item
+        if sale_line_item is None:
+            return None #sale line item not found
+        
+        product = self.search_product(sale_line_item.upc) #find corresponding product
+        description = product.product_name #get the product description 
+        subtotal = round(sale_line_item.quantity * sale_line_item.price, 2)
+
+        # the dash in %-30s left-aligns the text. the 6 in %6.2f is for 6 spaces to keep allignment with each sale item 
+        return "%-30s - %6.2f x %6.2f - %6.2f\n" % (description, sale_line_item.quantity, sale_line_item.price, subtotal)
+    
+    
 
 
