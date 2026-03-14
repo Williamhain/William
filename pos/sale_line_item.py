@@ -7,6 +7,7 @@ class SaleLineItem:
         self.price = price
         self.upc = upc
 
+    #comments
     def __eq__(self, other):
         if not isinstance(other, SaleLineItem):
             return False

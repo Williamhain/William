@@ -20,5 +20,6 @@ class Sale:
             self.pst == other.pst and
             self.total == other.total)
     
+    #returns the list of sale line items in current sale
     def get_number_sale_line_items(self):
-        return len(self.line_items) #return the list of sale line items in current sale
+        return len(self.line_items) 

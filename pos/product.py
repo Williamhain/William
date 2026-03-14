@@ -5,6 +5,7 @@ class Product:
         self.upc = upc
         self.product_name = product_name
         self.price = price
-
+        
+    #returns true if the UPC, name, and price match (a duplicate product)
     def __eq__(self, other):
-        return (self.upc == other.upc and self.product_name == other.product_name and self.price == other.price) #otherwise, return true if the UPC, name, and price match (a duplicate product)
+        return (self.upc == other.upc and self.product_name == other.product_name and self.price == other.price) 
