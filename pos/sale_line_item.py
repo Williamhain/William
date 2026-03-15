@@ -7,7 +7,8 @@ class SaleLineItem:
         self.price = price
         self.upc = upc
 
-    #comments
+    # Compares this SaleLineItem with another object to check for equality.
+    # Returns True if the other object is a SaleLineItem and their code, quantity, price, and UPC match exactly.
     def __eq__(self, other):
         if not isinstance(other, SaleLineItem):
             return False

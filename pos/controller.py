@@ -130,8 +130,10 @@ class Controller:
 
         return product_list
 
-    #comments
+    # initiates a new sale and sets it as the current active sale.
+    # returns True if successful, or False if a sale is already in progress or the user is not logged in.
     def initiate_sale(self):
+
         if not self._logged_in:
             return False #do not allow user to make a sale if not logged in
         
@@ -142,12 +144,14 @@ class Controller:
 
         return True
     
-    #comments
+    # retrieves the currently active sale object.
+    # returns the Sale object, or None if no sale is in progress.    
     def get_current_sale(self):
         return self._current_sale    
     
 
-    #comments
+    # cancels the current active sale by clearing the current sale session.
+    # returns True if successfully cancelled, or False if no sale is active or the user is not logged in.
     def cancel_current_sale(self):
 
         if not self._logged_in:
@@ -159,11 +163,12 @@ class Controller:
         self._current_sale = None
         return True
     
-    #comments
+    # helper method to add a finished sale object to the system's collection of sales.
     def add_sale(self, sale):
         self._sales.append(sale)
 
-    #comments
+    # searches for a specific sale by its unique sale ID.
+    # returns the Sale object if found, or None if not found or the user is not logged in.
     def search_sale(self, sale_id):
 
         if not self._logged_in:
@@ -175,7 +180,8 @@ class Controller:
 
         return None
     
-    #comments
+    # retrieves a list of all sales currently registered in the system.
+    # returns the list of sales, or None if the user is not logged in.
     def list_sales(self):
 
         if not self._logged_in:
@@ -183,7 +189,9 @@ class Controller:
 
         return self._sales
     
-    #comments
+    # creates a new line item for the current sale using an auto-incremented code, 
+    # then appends it to the current sale's item list.
+    # returns the newly created SaleLineItem object, or None if no sale is active or the user is not logged in.
     def create_sale_line_item(self, quantity, price, upc):
         if not self._logged_in or self._current_sale is None:
             return None
@@ -198,7 +206,8 @@ class Controller:
         
         return new_item
 
-    #comments
+    # Searches the current sale's line items by their auto-incremented code.
+    # Returns the SaleLineItem object if found, or None if not found, no sale is active, or the user is not logged in.
     def search_sale_line_item(self, code):
         if not self._logged_in or self._current_sale is None:
             return None
@@ -258,6 +267,7 @@ class Controller:
         sale_date = datetime.now().date() #today's date
         
         finished_sale = Sale(sale_id, sale_date, subtotal, gst, pst, total) #create final sale object
+        finished_sale.sale_receipt = self.print_sale_receipt()
         self._sales.append(finished_sale) #add sale to list
         self._current_sale = None #set current sale to none now that sale is completed
         return finished_sale
@@ -284,6 +294,49 @@ class Controller:
         # the dash in %-30s left-aligns the text. the 6 in %6.2f is for 6 spaces to keep allignment with each sale item 
         return "%-30s - %6.2f x %6.2f - %6.2f\n" % (description, sale_line_item.quantity, sale_line_item.price, subtotal)
     
+    def print_sale_line_items(self):
+        if not self._logged_in or self._current_sale is None:
+            return None
+        
+        # Check if the current sale has no items
+        if self._current_sale.get_number_sale_line_items() == 0:
+            return None
+            
+        result = ""
+        for item in self._current_sale.line_items:
+            result += self.print_sale_line_item(item.code)
+        return result
+
+    def print_sale_receipt(self):
+        if not self._logged_in or self._current_sale is None:
+            return None
+            
+        if self._current_sale.get_number_sale_line_items() == 0:
+            return None
+            
+        sale_id = len(self._sales) + 1 
+        
+        # Calculate totals for the receipt
+        subtotal = sum((item.quantity * item.price) for item in self._current_sale.line_items)
+        subtotal = round(subtotal, 2)
+        gst = round(subtotal * 0.05, 2)
+        pst = round(subtotal * 0.07, 2)
+        total = round(subtotal + gst + pst, 2)
+        
+        # Build the exact string format expected by the tests
+        receipt = "MARKET AT VICTORIA - SALES RECEIPT\n\n"
+        receipt += f"Sale # {sale_id}\n\n"
+        receipt += "-----------------------------------------------------------\n"
+        receipt += "ITEM NAME                      -    QTY x   UNIT - SUBTOTAL\n\n"
+        receipt += self.print_sale_line_items()
+        receipt += "-----------------------------------------------------------\n"
+        receipt += f"NET SALE                                         - {subtotal:>6.2f}\n"
+        receipt += f"GST (5%)                                         - {gst:>6.2f}\n"
+        receipt += f"PST (7%)                                         - {pst:>6.2f}\n"
+        receipt += "-----------------------------------------------------------\n"
+        receipt += f"TOTAL SALE                                       - {total:>6.2f}\n"
+        
+        return receipt
     
 
 

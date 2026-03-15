@@ -11,7 +11,8 @@ class Sale:
         self.line_items = []
         self._item_counter = 1
 
-    #comment
+    # compares this Sale object with another object to check for equality.
+    # returns True if the other object is a Sale and all core attributes (ID, date, and financials) match.
     def __eq__(self, other):
         return (self.sale_id == other.sale_id and
             self.sale_date == other.sale_date and
@@ -23,3 +24,6 @@ class Sale:
     #returns the list of sale line items in current sale
     def get_number_sale_line_items(self):
         return len(self.line_items) 
+
+    def get_sale_receipt(self):
+        return getattr(self, 'sale_receipt', None)
