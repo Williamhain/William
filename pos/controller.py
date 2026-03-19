@@ -1,342 +1,639 @@
-# controller.py
+from datetime import date, datetime
 from pos.product import Product
 from pos.sale import Sale
 from pos.sale_line_item import SaleLineItem
-from datetime import datetime
 
-class Controller:
-    def __init__(self):
-        self._logged_in = False #set log-in flag initially to false (user is not logged in)
-        self._products = {} #creates an empty dictionary with the UPC code for the product as the key. So, _products will become a long lookup table list of products
-        self._current_sale = None
-        self._sales = []
-        self._sale_counter = 1
+class Controller():
+	"""
+	Coordinates operations within the point-of-sale (POS) system.
+
+	The ``Controller`` acts as the application-layer façade responsible
+	for managing sales and products. It mediates between client code
+	(e.g., user interface or tests) and the underlying domain entities
+	(``Sale``, ``Product``), ensuring consistent creation, retrieval,
+	and management of transactional data.
+
+	Attributes
+	----------
+	sales : list of Sale
+		Collection of sales managed by the controller.
+	products : list of Product
+		Collection of products available in the system.
+	sale_counter : int
+		Internal counter used to assign unique identifiers to sales.
+	"""
+
+	def __init__(self):
+		"""
+		Initialize a new Controller instance.
+
+		Parameters
+		----------
+		None
+
+		Returns
+		-------
+		None
+		"""
+		self.users = {"user" : "pos2026"}
+
+		self.username = None
+		self.password = None
+		self.logged = False
+
+		self.products = {}
+		self.sales = {}
+		self.current_sale = None
+		self.sales_counter = 0
+
+	def login(self, username, password):
+		"""
+		Authenticate a user and log them into the system.
+
+		Parameters
+		----------
+		username : str
+			Username of the user attempting to log in.
+		password : str
+			Password corresponding to the username.
+
+		Returns
+		-------
+		bool
+			True if login succeeds; otherwise False.
+		"""
+		if self.logged:
+			return False
+		if username in self.users:
+			if password == self.users[username]:
+				self.username = username
+				self.password = password
+				self.logged = True
+				return True
+			else:
+				return False
+		else:
+			return False
+
+	def logout(self):
+		"""
+		Log out the current user and reset session state.
+
+		Parameters
+		----------
+		None
+
+		Returns
+		-------
+		bool
+			True if logout succeeds; otherwise False.
+		"""
+		if not self.logged:
+			return False
+		else:
+			self.username = None
+			self.password = None
+			self.logged = False
+			self.current_sale = None
+			return True
+
+	def search_product(self, upc):
+		"""
+		Search for a product by its UPC.
+
+		Parameters
+		----------
+		upc : str
+			Universal Product Code to search for.
+
+		Returns
+		-------
+		Product or None
+			The matching product if found; otherwise None.
+		"""
+
+		# must be logged in to do operation
+		if not self.logged:
+			return None
+
+		return self.products.get(upc)
+
+	def create_product(self, upc, description, price):
+		"""
+		Create and register a new product.
+
+		Parameters
+		----------
+		upc : str
+			Universal Product Code of the new product.
+		description : str
+			Product description.
+		price : float
+			Unit price of the product.
+
+		Returns
+		-------
+		Product or None
+			The newly created product if successful; otherwise None
+			due to login failure or existing product.
+		"""
+ 
+ 		# must be logged in to do operation
+		if not self.logged:
+			return None
+
+		# product already exists, do not create them
+		if self.products.get(upc):
+			return None
+
+		# finally, create a new product
+		product = Product(upc, description, price)
+		self.products[upc] = product
+		return product
+
+	def retrieve_products(self, description):
+		"""
+		Retrieve products containing a description substring.
+
+		Parameters
+		----------
+		description : str
+			Substring to search within product descriptions.
+
+		Returns
+		-------
+		list of Product or None
+			List of products whose description contains the substring, or None if not logged in.
+		"""
+ 
+ 		# must be logged in to do operation
+		if not self.logged:
+			return None
+
+		retrieved_products = []
+		for product in self.products.values():
+			if description in product.description:
+				retrieved_products.append(product)
+		return retrieved_products
+
+	def update_product(self, original_upc, upc, description, price):
+		"""
+		Update the details of an existing product.
+
+		Parameters
+		----------
+		original_upc : str
+			Original UPC of the product.
+		upc : str
+			New UPC for the product.
+		description : str
+			New product description.
+		price : float
+			New unit price.
+
+		Returns
+		-------
+		bool
+			True if update succeeded; otherwise False.
+		"""
+
+		# must be logged in to do operation
+		if not self.logged:
+			return False
+
+		# first, search the product by key
+		product = self.products.get(original_upc)
+
+		# product does not exist, cannot update
+		if not product:
+			return False
+
+		# product exists, update fields
+		product.description = description
+		product.price = price
+
+		# treat different keys as a separate case
+		if original_upc != upc:
+			if self.products.get(upc):
+				return False
+			self.products.pop(original_upc)
+			product.upc = upc
+			self.products[upc] = product
+
+		return True
+			
+	def delete_product(self, upc):
+		"""
+		Delete a product by its UPC.
+
+		Parameters
+		----------
+		upc : str
+			UPC of the product to delete.
+
+		Returns
+		-------
+		bool
+			True if deletion succeeded; otherwise False.
+		"""
+
+		# must be logged in to do operation
+		if not self.logged:
+			return False
+
+		# first, search the product by key
+		product = self.products.get(upc)
+
+		# product does not exist, cannot delete
+		if not product:
+			return False
+
+		# product exists, delete product
+		self.products.pop(upc)
+		return True
+	
+	def list_products(self):
+		"""
+		Return all products.
+
+		Returns
+		-------
+		list of Product or None
+			List of all products if logged in; otherwise None.
+		"""
+
+		# must be logged in to do operation
+		if not self.logged:
+			return None
+
+		products_list = []
+		for product in self.products.values():
+			products_list.append(product)
+		return products_list
+
+	def add_sale(self, sale):
+		"""
+		Helper method to add a sale to the sales collection.
+
+		Parameters
+		----------
+		sale : Sale
+			Sale instance to add.
+
+		Returns
+		-------
+		None
+		"""
+
+		self.sales_counter += 1
+		self.sales[sale.id] = sale
+
+	def search_sale(self, id):
+		"""
+		Search for a sale by ID.
+
+		Parameters
+		----------
+		id : int
+			Identifier of the sale.
+
+		Returns
+		-------
+		Sale or None
+			Sale instance if found; otherwise None.
+		"""
+  
+  		# must be logged in to do operation
+		if not self.logged:
+			return None
+
+		return self.sales.get(id)
+
+	def list_sales(self):
+		"""
+		Return all sales.
+
+		Returns
+		-------
+		list of Sale or None
+			All sales if logged in; otherwise None.
+		"""
+
+		# must be logged in to do operation
+		if not self.logged:
+			return None
+
+		sales_list = []
+		for sale in self.sales.values():
+			sales_list.append(sale)
+		return sales_list
+
+	def initiate_sale(self):
+		"""
+		Start a new sale transaction.
+
+		Returns
+		-------
+		bool
+			True if sale initiation succeeds; otherwise False.
+		"""
+  
+		# must be logged in to do operation
+		if not self.logged:
+			return False
+		
+		# there is a current sale is current sale, cannot update
+		if self.current_sale:
+			return False
+		
+		# create a sale with default values (null and zero) and make it the current sale
+		sale  = Sale()
+		self.current_sale = sale
+		return True
+
+	def cancel_current_sale(self):
+		"""
+		Cancel the currently active sale.
+
+		Returns
+		-------
+		bool
+			True if cancellation succeeds; otherwise False.
+		"""
+
+		# must be logged in to do operation
+		if not self.logged:
+			return False
+		
+		# there is no current sale to be cancelled, cannot cancel
+		if not self.current_sale:
+			return False
+		
+		# cancel an existing initiated sale
+		self.current_sale = None
+		return True
+
+	def add_new_sale_line_item(self, quantity, upc):
+		"""
+		Add a new line item to the current sale.
+
+		Parameters
+		----------
+		quantity : float
+			Quantity of the product.
+		upc : str
+			UPC of the product.
+
+		Returns
+		-------
+		SaleLineItem or None
+			The newly created line item if successful; otherwise None.
+		"""
+
+		# must be logged in to do operation
+		if not self.logged:
+			return None
+		
+		# there is no current sale to add sale line item, cannot add
+		if not self.current_sale:
+			return None
+		
+		# check whether the product is valid before adding the sale line item
+		product = self.search_product(upc)
+		if not product:
+			return None
+		
+		# query the product price first 
+		price = product.price
+
+		# create a new sale line item with another system operation
+		return self.create_sale_line_item(quantity, price, upc)
 
 
-    
-    # logs the user in as long as a valid username and password is used
-    # returns True if login is successful
-    # returns False if user is already logged in or an incorrect username or password is used 
-    def login(self, username, password):
+	def finish_current_sale(self):
+		"""
+		Finalize the current sale, computing totals and adding it to the sales collection.
 
-        if self._logged_in: 
-            return False #login attempt fails because user is already logged in
+		Returns
+		-------
+		Sale or None
+			The finalized sale if successful; otherwise None.
+		"""
+ 
+		# must be logged in to do operation
+		if not self.logged:
+			return None
+		
+		# there is no current sale to be cancelled, cannot cancel
+		if not self.current_sale:
+			return None
+		
+		# cannot finish current sale with no sale line items
+		if self.current_sale.get_number_sale_line_items() == 0:
+			return None
 
-        if username == "user" and password == "pos2026": #should be user, not "theuser"
-            self._logged_in = True 
-            return True #login succeeds
-        return False #login fails because of incorrect username or password
-    
-    # logs the user out
-    # returns True if the user is successfully logged out
-    # reutnrs False if the user is not logged in
+		# set the relevant fields in the current sale
+		self.sales_counter += 1
+		self.current_sale.id = self.sales_counter
+		self.current_sale.date = datetime.now().date()
+		self.current_sale.total = round(self.current_sale.compute_sale_total(), 2)
+		self.current_sale.gst = round(0.05 * self.current_sale.total, 2)
+		self.current_sale.pst = round(0.07 * self.current_sale.total, 2) 
+		self.current_sale.customer_total = round(self.current_sale.total + self.current_sale.gst + self.current_sale.pst, 2)
 
-    def logout(self):
-        if not self._logged_in: #if not logged in, do nothing
-            return False #logout fails because user isn't logged in
-        self._logged_in = False #set to logged out
-        return True 
-    
-    # creates a Product object and assigns a UPC to it and stores in the products dictionary 
-    # returns newly created product object
-    def create_product(self, upc, product_name, price):
-        if not self._logged_in:
-            return None #return None if not logged in
-    
-        if upc in self._products: #check if the product with the same UPC already exists
-            return None #if the product already exists, do nothing and return None
-        
-        product = Product(upc, product_name, price) 
-        self._products[upc] = product 
-        return product 
-    
-    # searches for a specific product by UPC code
-    # returns the product if found
-    def search_product(self, upc): #search for a specific product by UPC
-        actual_product = self._products.get(upc)
-        return actual_product 
+		# add the current sale to the sales collection
+		self.sales[self.current_sale.id] = self.current_sale		
+		
+		# print the sale receipt, finish current sale and return the sale with success
+		self.current_sale.set_sale_receipt(self.print_sale_receipt())
+		temp = self.current_sale
+		self.current_sale = None
+		return temp
+	
 
-    # searches for a specific product in the dictionary via some part of its description, then
-    # appends the product to the retrieved list if found
-    # returns the retrieved list
-    def retrieve_products(self, product_name):
-        
-        if not self._logged_in:
-            return None #do not allow user to search for a product if not logged in
-        
-        retrieved_list = []
+	def print_sale_receipt(self):
+		"""
+		Generate a formatted string representing the sale receipt.
 
-        for product in self._products.values(): 
-            if product_name in product.product_name: #check if the searched text is in the product's name
-                retrieved_list.append(product) 
+		Returns
+		-------
+		str or None
+			Formatted sale receipt if a current sale exists with line items; otherwise None.
+		"""
 
-        return retrieved_list 
+		# must be logged in to do operation
+		if not self.logged:
+			return None
+		
+		# there is no current sale to be printed, cannot print
+		if not self.current_sale:
+			return None
+		
+		# cannot print current sale with no sale line items
+		if self.current_sale.get_number_sale_line_items() == 0:
+			return None
 
-    # updates a product by modifying its old UPC and replacing with a new UPC
-    # stores the product under a new upc as long as the product doesn't already
-    # exist with the same upc
-    # returns True if the product is successfully updated
-    def update_product(self, upc, updated_upc, updated_product_name, updated_price):
-        
-        if not self._logged_in: #do not allow user to update product if not logged in
-            return False
-        
-        product = self.search_product(upc) 
-        if product is None:
-            return False #product not found
+		# print the sale receipt
+		receipt = "MARKET AT VICTORIA - SALES RECEIPT\n\n"
+		receipt += f"Sale # {self.current_sale.id}\n\n"
+		receipt += "-----------------------------------------------------------\n"
+		receipt += "ITEM NAME                      -    QTY x   UNIT - SUBTOTAL\n\n"
+		for i in range(self.current_sale.get_number_sale_line_items()):
+			receipt += self.print_sale_line_item(i+1)
+		receipt += "-----------------------------------------------------------\n"
+		receipt += f"NET SALE                                         - {self.current_sale.total:6.2f}\n"
+		receipt += f"GST (5%)                                         - {self.current_sale.gst:6.2f}\n"
+		receipt += f"PST (7%)                                         - {self.current_sale.pst:6.2f}\n"
+		receipt += "-----------------------------------------------------------\n"
+		receipt += f"TOTAL SALE                                       - {self.current_sale.customer_total:6.2f}\n"
+		return receipt
+		 			
 
-        if updated_upc != upc: 
-            if updated_upc in self._products: 
-                return False #if the updated upc is already found in the dictionary (and is not the same as the original upc) then we reject the update
-        
-        if updated_upc != upc:
-            product = self._products.pop(upc) #remove the old UPC 
-            self._products[updated_upc] = product #store the product under the new UPC
+	def get_current_sale(self):
+		"""
+		Return the currently active sale.
 
-        product.upc = updated_upc
-        product.product_name = updated_product_name
-        product.price = updated_price
-        return True
-    
-    # removes an existing product from the dictionary
-    # returns True if product was successfully deleted
-    def delete_product(self, upc):
+		Returns
+		-------
+		Sale or None
+			Current sale if logged in; otherwise None.
+		"""
 
-        if not self._logged_in: 
-            return False #do not allow user to delete product if not logged in 
-        
-        if upc not in self._products:
-            return False #the product is not in the dictionary
-            
-        del self._products[upc] #delete the specified product by UPC
+		# must be logged in to do operation
+		if not self.logged:
+			return None
 
-        return True
-    
-    # Appends valid products to a product list
-    # returns an empty list if the list is empty
-    # returns the product list if products are successfully added to the list
-    def list_products(self):
+		# return current sale
+		return self.current_sale
 
-        if not self._logged_in:
-            return None #do not allow user to list the products if not logged in
-        
-        if len(self._products) == 0:
-            return [] 
-        
-        product_list = []
+	def print_sale_line_items(self):
+		"""
+		Return a string representing all sale line items for the current sale.
 
-        for product in self._products.values(): 
-            product_list.append(product) #add each product to the list
+		Returns
+		-------
+		str or None
+			Formatted string of all line items; None if no current sale or not logged in.
+		"""
+ 
+ 		# must be logged in to do operation
+		if not self.logged:
+			return None
 
-        return product_list
+		# there must be a valid current sale
+		if not self.current_sale:
+			return None
 
-    # initiates a new sale and sets it as the current active sale.
-    # returns True if successful, or False if a sale is already in progress or the user is not logged in.
-    def initiate_sale(self):
+		# create the string with the list of sale line items
+		print_string = ""
+		total_items = self.current_sale.get_number_sale_line_items()
+		for i in range(total_items):
+			print_string += self.print_sale_line_item(i+1)
+		if not print_string:
+			return None
+		else:
+			return print_string
 
-        if not self._logged_in:
-            return False #do not allow user to make a sale if not logged in
-        
-        if self._current_sale is not None:
-            return False #if there is already a sale being made, do not start another sale
-        
-        self._current_sale = Sale(None, None, 0.00, 0.00, 0.00, 0.00) #default current sale
+	def search_sale_line_item(self, code):
+		"""
+		Search for a sale line item in the current sale by code.
 
-        return True
-    
-    # retrieves the currently active sale object.
-    # returns the Sale object, or None if no sale is in progress.    
-    def get_current_sale(self):
-        return self._current_sale    
-    
+		Parameters
+		----------
+		code : int
+			Code/index of the line item to search.
 
-    # cancels the current active sale by clearing the current sale session.
-    # returns True if successfully cancelled, or False if no sale is active or the user is not logged in.
-    def cancel_current_sale(self):
+		Returns
+		-------
+		SaleLineItem or None
+			Matching line item if found; otherwise None.
+		"""
 
-        if not self._logged_in:
-            return False
+		# must be logged in to do operation
+		if not self.logged:
+			return None
 
-        if self._current_sale is None:
-            return False
+		# there must be a valid current sale
+		if not self.current_sale:
+			return None
 
-        self._current_sale = None
-        return True
-    
-    # helper method to add a finished sale object to the system's collection of sales.
-    def add_sale(self, sale):
-        self._sales.append(sale)
+		# search a new sale line item with the given code and return it 
+		return self.current_sale.search_sale_line_item(code)
 
-    # searches for a specific sale by its unique sale ID.
-    # returns the Sale object if found, or None if not found or the user is not logged in.
-    def search_sale(self, sale_id):
+	def create_sale_line_item(self, quantity, price, upc):
+		"""
+		Create a new sale line item and add it to the current sale.
 
-        if not self._logged_in:
-            return None
+		Parameters
+		----------
+		quantity : float
+			Quantity of the product.
+		price : float
+			Unit price of the product.
+		upc : str
+			UPC of the product.
 
-        for sale in self._sales:
-            if sale.sale_id == sale_id:
-                return sale
+		Returns
+		-------
+		SaleLineItem or None
+			Newly created line item if successful; otherwise None.
+		"""
 
-        return None
-    
-    # retrieves a list of all sales currently registered in the system.
-    # returns the list of sales, or None if the user is not logged in.
-    def list_sales(self):
+		# must be logged in to do operation
+		if not self.logged:
+			return None
 
-        if not self._logged_in:
-            return None
+		# there must be a valid current sale
+		if not self.current_sale:
+			return None
 
-        return self._sales
-    
-    # creates a new line item for the current sale using an auto-incremented code, 
-    # then appends it to the current sale's item list.
-    # returns the newly created SaleLineItem object, or None if no sale is active or the user is not logged in.
-    def create_sale_line_item(self, quantity, price, upc):
-        if not self._logged_in or self._current_sale is None:
-            return None
-            
-        #get the auto-incremented code from the current sale
-        code = self._current_sale._item_counter
-        self._current_sale._item_counter += 1
-        
-        #create the item and add it to the current sale's list
-        new_item = SaleLineItem(code, quantity, price, upc)
-        self._current_sale.line_items.append(new_item)
-        
-        return new_item
+		# create a new sale line item and return it
+		return self.current_sale.create_sale_line_item(quantity, price, upc)
+	
+	def print_sale_line_item(self, code):
+		"""
+		Return a formatted string representing a single sale line item.
 
-    # Searches the current sale's line items by their auto-incremented code.
-    # Returns the SaleLineItem object if found, or None if not found, no sale is active, or the user is not logged in.
-    def search_sale_line_item(self, code):
-        if not self._logged_in or self._current_sale is None:
-            return None
-            
-        #search through the current sale's line items
-        for item in self._current_sale.line_items:
-            if item.code == code:
-                return item
-        return None
-    
-    # Adds a new sale line item to the current sale using a product UPC
-    # returns the newly created sale line item
-    # returns None if there is no current sale or if the product doesn't exist in the dictionary
-    def add_new_sale_line_item(self, quantity, upc): 
-        if not self._logged_in:
-            return None #do not allow to add a new item if user is not logged in
-        
-        if self._current_sale is None:
-            return None #do not allow to add a new item if there is no active current sale
-        
-        product = self.search_product(upc)
-        if product is None:
-            return None #if the product doesn't exist in the dictionary, return None
-        
-        return self.create_sale_line_item(quantity, product.price, upc) #add the created item from the create sale item method to the list of items in the current sale
-    
-    # Returns the number of sale objects in the list
-    def get_number_sales(self):
-        return len(self._sales) 
+		Parameters
+		----------
+		code : int
+			Code/index of the line item to print.
 
-    # adds all sale line items to a finished sale list and performs all required
-    # calculations including finding the total, subtotal, gst, pst. 
-    # also, tracks all sale ids and time and date of sale
-    # returns the finished sale list
-    def finish_current_sale(self):
+		Returns
+		-------
+		str or None
+			Formatted string of the line item; None if invalid or not logged in.
+		"""
 
-        if not self._logged_in:
-            return None #user can't finish a sale if they aren't logged in
-        
-        if self._current_sale is None:
-            return None #check if there is no current sale
-        
-        if self._current_sale.get_number_sale_line_items() == 0:
-            return None #can't complete a sale without any line items
-        
-        subtotal = 0
+		# must be logged in to do operation
+		if not self.logged:
+			return None
 
-        for item in self._current_sale.line_items: #loop through all sale line items
-            subtotal += item.quantity * item.price #increment subtotal by the quantity of the item multiplied by the price
+		# there must be a valid current sale
+		if not self.current_sale:
+			return None
 
-        subtotal = round(subtotal, 2) #round subtotal to 2 decimal places
-        gst = round(subtotal * 0.05, 2) #GST is 5%
-        pst = round(subtotal * 0.07, 2) #PST is 7%
-        total = round(subtotal + gst + pst, 2) #final total of sale
+		# search the sale line item
+		sale_line_item = self.search_sale_line_item(code)
+		if not sale_line_item:
+			return None
+		else:
+			sale_line_item_string = ""
+			sale_line_item_string += f"{self.search_product(sale_line_item.upc).description:<30} - "
+			sale_line_item_string += f"{sale_line_item.quantity:6.2f}" + " x " + f"{sale_line_item.price:6.2f}" + " - "
+			sale_line_item_string += f"{round(sale_line_item.quantity * sale_line_item.price, 2):6.2f}\n"
+			return sale_line_item_string
 
-        sale_id = len(self._sales) + 1 #track each sale made 
-        sale_date = datetime.now().date() #today's date
-        
-        finished_sale = Sale(sale_id, sale_date, subtotal, gst, pst, total) #create final sale object
-        finished_sale.sale_receipt = self.print_sale_receipt()
-        self._sales.append(finished_sale) #add sale to list
-        self._current_sale = None #set current sale to none now that sale is completed
-        return finished_sale
-    
-    # Returns a formatted string of a single sale line item from the current sale that cotains
-    # the product description, quantity, sold, the price of the item and the subtotal. 
-    # returns None if there is no current sale or if the sale line item doesn't exist. 
-    def print_sale_line_item(self, code):
+	def get_number_sales(self):
+		"""
+		Return the total number of sales added to the system.
 
-        if not self._logged_in:
-            return None
-        
-        if self._current_sale is None:
-            return None #check if there is no current sale
-        
-        sale_line_item = self.search_sale_line_item(code) 
-        if sale_line_item is None:
-            return None #sale line item not found
-        
-        product = self.search_product(sale_line_item.upc) #find corresponding product
-        description = product.product_name #get the product description 
-        subtotal = round(sale_line_item.quantity * sale_line_item.price, 2)
+		Returns
+		-------
+		int
+			Number of sales.
+		"""
 
-        # the dash in %-30s left-aligns the text. the 6 in %6.2f is for 6 spaces to keep allignment with each sale item 
-        return "%-30s - %6.2f x %6.2f - %6.2f\n" % (description, sale_line_item.quantity, sale_line_item.price, subtotal)
-    
-    def print_sale_line_items(self):
-        if not self._logged_in or self._current_sale is None:
-            return None
-        
-        # Check if the current sale has no items
-        if self._current_sale.get_number_sale_line_items() == 0:
-            return None
-            
-        result = ""
-        for item in self._current_sale.line_items:
-            result += self.print_sale_line_item(item.code)
-        return result
-
-    def print_sale_receipt(self):
-        if not self._logged_in or self._current_sale is None:
-            return None
-            
-        if self._current_sale.get_number_sale_line_items() == 0:
-            return None
-            
-        sale_id = len(self._sales) + 1 
-        
-        # Calculate totals for the receipt
-        subtotal = sum((item.quantity * item.price) for item in self._current_sale.line_items)
-        subtotal = round(subtotal, 2)
-        gst = round(subtotal * 0.05, 2)
-        pst = round(subtotal * 0.07, 2)
-        total = round(subtotal + gst + pst, 2)
-        
-        # Build the exact string format expected by the tests
-        receipt = "MARKET AT VICTORIA - SALES RECEIPT\n\n"
-        receipt += f"Sale # {sale_id}\n\n"
-        receipt += "-----------------------------------------------------------\n"
-        receipt += "ITEM NAME                      -    QTY x   UNIT - SUBTOTAL\n\n"
-        receipt += self.print_sale_line_items()
-        receipt += "-----------------------------------------------------------\n"
-        receipt += f"NET SALE                                         - {subtotal:>6.2f}\n"
-        receipt += f"GST (5%)                                         - {gst:>6.2f}\n"
-        receipt += f"PST (7%)                                         - {pst:>6.2f}\n"
-        receipt += "-----------------------------------------------------------\n"
-        receipt += f"TOTAL SALE                                       - {total:>6.2f}\n"
-        
-        return receipt
-    
+		return self.sales_counter
 
 

@@ -1,32 +1,60 @@
-# sale_line_item_test.py
-import unittest
+from unittest import TestCase
+from unittest import main
 from pos.sale_line_item import SaleLineItem
+import datetime
 
-class SaleLineItemTest(unittest.TestCase):
-    def setUp(self):
-        #create some sale line items as examples to use for multiple tests
-        self.item1 = SaleLineItem(1, 2.0, 4.99, "037466022680")
-        self.item2 = SaleLineItem(1, 2.0, 4.99, "037466022680")
-        self.item3 = SaleLineItem(2, 1.0, 18.99, "629070500083")
+class SaleLineItemTest(TestCase):
+	def setUp(self):
+		self.sale_line_item = SaleLineItem(1, 2, 4.99, "037466022680")
 
-    def test_initialization(self):
-        #verify that the constructor assigns attributes properly
-        self.assertEqual(self.item1.code, 1, "Code should match the initialized value")
-        self.assertEqual(self.item1.quantity, 2.0, "Quantity should match")
-        self.assertEqual(self.item1.price, 4.99, "Price should match")
-        self.assertEqual(self.item1.upc, "037466022680", "UPC should match")
+	def test_eq(self):
+		same_sale_line_item = SaleLineItem(1, 2, 4.99, "037466022680")
+		different_sale_line_item_1 = SaleLineItem(1, 2, 4.99, "629070500083")
+		different_sale_line_item_2 = SaleLineItem(1, 3, 4.99, "037466022680")
+		different_sale_line_item_3 = SaleLineItem(1, 2, 4.50, "037466022680")
+		self.assertTrue(self.sale_line_item == self.sale_line_item)
+		self.assertTrue(self.sale_line_item == same_sale_line_item)
+		self.assertFalse(self.sale_line_item == different_sale_line_item_1)
+		self.assertFalse(self.sale_line_item == different_sale_line_item_2)
+		self.assertFalse(self.sale_line_item == different_sale_line_item_3)
 
-    def test_equality(self):
-        #verify that two separate items with the same data are equal
-        self.assertTrue(self.item1 == self.item2, "Items with identical data should be equal")
-        
-        #verify that items with different data are not equal
-        self.assertFalse(self.item1 == self.item3, "Items with different data should not be equal")
+	def test_str(self):
+		same_sale_line_item = SaleLineItem(1, 2, 4.99, "037466022680")
+		different_sale_line_item_1 = SaleLineItem(1, 2, 4.99, "629070500083")
+		different_sale_line_item_2 = SaleLineItem(1, 3, 4.99, "037466022680")
+		different_sale_line_item_3 = SaleLineItem(1, 2, 4.50, "037466022680")
+		self.assertEqual("1; 2; 4.99; 037466022680", str(same_sale_line_item))
+		self.assertEqual(str(self.sale_line_item.code) + "; " + str(self.sale_line_item.quantity) + "; " \
+				   + str(self.sale_line_item.price) + "; " + self.sale_line_item.upc, str(same_sale_line_item))
+		self.assertEqual(str(different_sale_line_item_1.code) + "; " + str(different_sale_line_item_1.quantity) + "; " \
+				   + str(different_sale_line_item_1.price) + "; " + different_sale_line_item_1.upc, str(different_sale_line_item_1))
+		self.assertEqual(str(different_sale_line_item_2.code) + "; " + str(different_sale_line_item_2.quantity) + "; " \
+				   + str(different_sale_line_item_2.price) + "; " + different_sale_line_item_2.upc, str(different_sale_line_item_2))
+		self.assertEqual(str(different_sale_line_item_3.code) + "; " + str(different_sale_line_item_3.quantity) + "; " \
+				   + str(different_sale_line_item_3.price) + "; " + different_sale_line_item_3.upc, str(different_sale_line_item_3))
+		self.assertEqual(str(same_sale_line_item), str(self.sale_line_item))
+		self.assertNotEqual(str(different_sale_line_item_1), str(self.sale_line_item))
+		self.assertNotEqual(str(different_sale_line_item_2), str(self.sale_line_item))
+		self.assertNotEqual(str(different_sale_line_item_3), str(self.sale_line_item))
 
-    def test_string_representation(self):
-        #verify that the string representations return valid strings
-        self.assertIsInstance(str(self.item1), str, "__str__ should return a string")
-        self.assertIsInstance(repr(self.item1), str, "__repr__ should return a string")
+	def test_repr(self):
+		same_sale_line_item = SaleLineItem(1, 2, 4.99, "037466022680")
+		different_sale_line_item_1 = SaleLineItem(1, 2, 4.99, "629070500083")
+		different_sale_line_item_2 = SaleLineItem(1, 3, 4.99, "037466022680")
+		different_sale_line_item_3 = SaleLineItem(1, 2, 4.50, "037466022680")
+		self.assertEqual("SaleLineItem(1, 2, 4.99, '037466022680')", repr(same_sale_line_item))
+		self.assertEqual("SaleLineItem(" + repr(same_sale_line_item.code) + ", " + repr(same_sale_line_item.quantity) + ", " \
+				   + repr(same_sale_line_item.price) + ", " + repr(same_sale_line_item.upc) + ")", repr(same_sale_line_item))
+		self.assertEqual("SaleLineItem(" + repr(different_sale_line_item_1.code) + ", " + repr(different_sale_line_item_1.quantity) + ", " \
+				   + repr(different_sale_line_item_1.price) + ", " + repr(different_sale_line_item_1.upc) + ")", repr(different_sale_line_item_1))
+		self.assertEqual("SaleLineItem(" + repr(different_sale_line_item_2.code) + ", " + repr(different_sale_line_item_2.quantity) + ", " \
+				   + repr(different_sale_line_item_2.price) + ", " + repr(different_sale_line_item_2.upc) + ")", repr(different_sale_line_item_2))
+		self.assertEqual("SaleLineItem(" + repr(different_sale_line_item_3.code) + ", " + repr(different_sale_line_item_3.quantity) + ", " \
+				   + repr(different_sale_line_item_3.price) + ", " + repr(different_sale_line_item_3.upc) + ")", repr(different_sale_line_item_3))
+		self.assertEqual(repr(same_sale_line_item), repr(self.sale_line_item))
+		self.assertNotEqual(repr(different_sale_line_item_1), repr(self.sale_line_item))
+		self.assertNotEqual(repr(different_sale_line_item_2), repr(self.sale_line_item))
+		self.assertNotEqual(repr(different_sale_line_item_3), repr(self.sale_line_item))
 
 if __name__ == '__main__':
-    unittest.main()
+	unittest.main()
