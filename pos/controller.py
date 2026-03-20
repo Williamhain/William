@@ -23,7 +23,7 @@ class Controller():
 		Internal counter used to assign unique identifiers to sales.
 	"""
 
-	def __init__(self):
+	def __init__(self, autosave=False):
 		"""
 		Initialize a new Controller instance.
 
@@ -35,6 +35,7 @@ class Controller():
 		-------
 		None
 		"""
+		self.autosave = autosave
 		self.users = {"user" : "pos2026"}
 
 		self.username = None
