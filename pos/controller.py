@@ -3,6 +3,8 @@ from pos.product import Product
 from pos.sale import Sale
 from pos.sale_line_item import SaleLineItem
 
+import hashlib
+
 class Controller():
 	"""
 	Coordinates operations within the point-of-sale (POS) system.
@@ -36,7 +38,11 @@ class Controller():
 		None
 		"""
 		self.autosave = autosave
-		self.users = {"user" : "pos2026"}
+		self.users = {
+			"user": self.get_password_hash("pos2026"),
+			"ali": "6394ffec21517605c1b426d43e6fa7eb0cff606ded9c2956821c2c36bfee2810",
+			"kala": "e5268ad137eec951a48a5e5da52558c7727aaa537c8b308b5e403e6b434e036e"
+		}
 
 		self.username = None
 		self.password = None
@@ -65,17 +71,19 @@ class Controller():
 		"""
 		if self.logged:
 			return False
-		if username in self.users:
-			if password == self.users[username]:
-				self.username = username
-				self.password = password
-				self.logged = True
-				return True
-			else:
-				return False
-		else:
+		
+		if not self.users.get(username): # username not found
 			return False
+		
+		password_hash = self.get_password_hash(password) # convert the password into hash value
+		if self.users.get(username) != password_hash:
+			return False # incorrect password
 
+		self.username = username
+		self.password = password_hash
+		self.logged = True
+		return True
+			
 	def logout(self):
 		"""
 		Log out the current user and reset session state.
@@ -636,5 +644,10 @@ class Controller():
 		"""
 
 		return self.sales_counter
-
+	
+	def get_password_hash(self, password):
+		encoded_password = password.encode('utf-8') #converts string to bytes for hashing purposes
+		hash_object = hashlib.sha256(encoded_password) #create sha-256 hash object using the created bytes
+		hex_dig = hash_object.hexdigest() #converts hash to readable hex string
+		return hex_dig #returns the final hashed password
 
