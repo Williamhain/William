@@ -2,6 +2,9 @@ from datetime import date, datetime
 from pos.product import Product
 from pos.sale import Sale
 from pos.sale_line_item import SaleLineItem
+from pos.exception.illegal_access_exception import IllegalAccessException
+from pos.exception.illegal_operation_exception import IllegalOperationException
+from pos.exception.invalid_product_exception import InvalidProductException
 
 import hashlib
 
@@ -123,8 +126,7 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			return None
-
+			raise IllegalAccessException("User must be logged in to search products.")
 		return self.products.get(upc)
 
 	def create_product(self, upc, description, price):
@@ -149,11 +151,10 @@ class Controller():
  
  		# must be logged in to do operation
 		if not self.logged:
-			return None
-
+			raise IllegalAccessException("User must be logged in to create products.")
 		# product already exists, do not create them
 		if self.products.get(upc):
-			return None
+			raise IllegalOperationException("Product with this UPC already exists.")
 
 		# finally, create a new product
 		product = Product(upc, description, price)
@@ -177,7 +178,7 @@ class Controller():
  
  		# must be logged in to do operation
 		if not self.logged:
-			return None
+			raise IllegalAccessException("User must be logged in to retrieve products.")
 
 		retrieved_products = []
 		for product in self.products.values():
@@ -208,14 +209,14 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			return False
+			raise IllegalAccessException("User must be logged in to update products.")
 
 		# first, search the product by key
 		product = self.products.get(original_upc)
 
 		# product does not exist, cannot update
 		if not product:
-			return False
+			raise InvalidProductException("Cannot update: Original product does not exist.")
 
 		# product exists, update fields
 		product.description = description
@@ -224,7 +225,7 @@ class Controller():
 		# treat different keys as a separate case
 		if original_upc != upc:
 			if self.products.get(upc):
-				return False
+				raise IllegalOperationException("Cannot update: A product with the new UPC already exists.")
 			self.products.pop(original_upc)
 			product.upc = upc
 			self.products[upc] = product
@@ -248,14 +249,14 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			return False
+			raise IllegalAccessException("User must be logged in to delete products.")
 
 		# first, search the product by key
 		product = self.products.get(upc)
 
 		# product does not exist, cannot delete
 		if not product:
-			return False
+			raise InvalidProductException("Cannot delete: Product does not exist.")
 
 		# product exists, delete product
 		self.products.pop(upc)
@@ -273,7 +274,7 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			return None
+			raise IllegalAccessException("User must be logged in to list products.")
 
 		products_list = []
 		for product in self.products.values():
