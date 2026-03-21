@@ -5,6 +5,10 @@ from pos.sale_line_item import SaleLineItem
 from pos.exception.illegal_access_exception import IllegalAccessException
 from pos.exception.illegal_operation_exception import IllegalOperationException
 from pos.exception.invalid_product_exception import InvalidProductException
+from pos.exception.invalid_login_exception import InvalidLoginException
+from pos.exception.duplicate_login_exception import DuplicateLoginException
+from pos.exception.invalid_logout_exception import InvalidLogoutException
+from pos.exception.no_current_sale_exception import NoCurrentSaleException
 
 import hashlib
 
@@ -41,8 +45,9 @@ class Controller():
 		None
 		"""
 		self.autosave = autosave
+		# hard code users passwords in, change later
 		self.users = {
-			"user": self.get_password_hash("pos2026"),
+			"user": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
 			"ali": "6394ffec21517605c1b426d43e6fa7eb0cff606ded9c2956821c2c36bfee2810",
 			"kala": "e5268ad137eec951a48a5e5da52558c7727aaa537c8b308b5e403e6b434e036e"
 		}
@@ -73,14 +78,14 @@ class Controller():
 			True if login succeeds; otherwise False.
 		"""
 		if self.logged:
-			return False
+			raise DuplicateLoginException()
 		
-		if not self.users.get(username): # username not found
-			return False
+		if username not in self.users:
+			raise InvalidLoginException()
 		
 		password_hash = self.get_password_hash(password) # convert the password into hash value
 		if self.users.get(username) != password_hash:
-			return False # incorrect password
+			raise InvalidLoginException() # incorrect password
 
 		self.username = username
 		self.password = password_hash
@@ -101,7 +106,7 @@ class Controller():
 			True if logout succeeds; otherwise False.
 		"""
 		if not self.logged:
-			return False
+			raise InvalidLogoutException()
 		else:
 			self.username = None
 			self.password = None
@@ -154,7 +159,7 @@ class Controller():
 			raise IllegalAccessException("User must be logged in to create products.")
 		# product already exists, do not create them
 		if self.products.get(upc):
-			raise IllegalOperationException("Product with this UPC already exists.")
+			raise IllegalOperationException()
 
 		# finally, create a new product
 		product = Product(upc, description, price)
@@ -216,7 +221,7 @@ class Controller():
 
 		# product does not exist, cannot update
 		if not product:
-			raise InvalidProductException("Cannot update: Original product does not exist.")
+			raise IllegalOperationException()
 
 		# product exists, update fields
 		product.description = description
@@ -256,7 +261,7 @@ class Controller():
 
 		# product does not exist, cannot delete
 		if not product:
-			raise InvalidProductException("Cannot delete: Product does not exist.")
+			raise IllegalOperationException()
 
 		# product exists, delete product
 		self.products.pop(upc)
@@ -315,7 +320,7 @@ class Controller():
   
   		# must be logged in to do operation
 		if not self.logged:
-			return None
+			raise IllegalAccessException()
 
 		return self.sales.get(id)
 
@@ -331,7 +336,7 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			return None
+			raise IllegalAccessException()
 
 		sales_list = []
 		for sale in self.sales.values():
@@ -350,11 +355,11 @@ class Controller():
   
 		# must be logged in to do operation
 		if not self.logged:
-			return False
+			raise IllegalAccessException()
 		
 		# there is a current sale is current sale, cannot update
 		if self.current_sale:
-			return False
+			raise IllegalOperationException()
 		
 		# create a sale with default values (null and zero) and make it the current sale
 		sale  = Sale()
@@ -373,11 +378,11 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			return False
+			raise IllegalAccessException()
 		
 		# there is no current sale to be cancelled, cannot cancel
 		if not self.current_sale:
-			return False
+			raise NoCurrentSaleException()
 		
 		# cancel an existing initiated sale
 		self.current_sale = None
@@ -402,16 +407,16 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			return None
+			raise IllegalAccessException()
 		
 		# there is no current sale to add sale line item, cannot add
 		if not self.current_sale:
-			return None
+			raise NoCurrentSaleException()
 		
 		# check whether the product is valid before adding the sale line item
 		product = self.search_product(upc)
 		if not product:
-			return None
+			raise InvalidProductException()
 		
 		# query the product price first 
 		price = product.price
@@ -432,15 +437,15 @@ class Controller():
  
 		# must be logged in to do operation
 		if not self.logged:
-			return None
+			raise IllegalAccessException()
 		
 		# there is no current sale to be cancelled, cannot cancel
 		if not self.current_sale:
-			return None
+			raise NoCurrentSaleException()
 		
 		# cannot finish current sale with no sale line items
 		if self.current_sale.get_number_sale_line_items() == 0:
-			return None
+			raise IllegalOperationException()
 
 		# set the relevant fields in the current sale
 		self.sales_counter += 1
@@ -473,11 +478,11 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			return None
+			raise IllegalAccessException()
 		
 		# there is no current sale to be printed, cannot print
 		if not self.current_sale:
-			return None
+			raise NoCurrentSaleException
 		
 		# cannot print current sale with no sale line items
 		if self.current_sale.get_number_sale_line_items() == 0:
@@ -511,7 +516,7 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			return None
+			raise IllegalAccessException()
 
 		# return current sale
 		return self.current_sale
@@ -528,11 +533,11 @@ class Controller():
  
  		# must be logged in to do operation
 		if not self.logged:
-			return None
+			raise IllegalAccessException()
 
 		# there must be a valid current sale
 		if not self.current_sale:
-			return None
+			raise NoCurrentSaleException()
 
 		# create the string with the list of sale line items
 		print_string = ""
@@ -561,11 +566,11 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			return None
+			raise IllegalAccessException()
 
 		# there must be a valid current sale
 		if not self.current_sale:
-			return None
+			raise NoCurrentSaleException()
 
 		# search a new sale line item with the given code and return it 
 		return self.current_sale.search_sale_line_item(code)
@@ -591,11 +596,11 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			return None
+			raise IllegalAccessException()
 
 		# there must be a valid current sale
 		if not self.current_sale:
-			return None
+			raise NoCurrentSaleException()
 
 		# create a new sale line item and return it
 		return self.current_sale.create_sale_line_item(quantity, price, upc)
@@ -617,11 +622,11 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			return None
+			raise IllegalAccessException()
 
 		# there must be a valid current sale
 		if not self.current_sale:
-			return None
+			raise NoCurrentSaleException()
 
 		# search the sale line item
 		sale_line_item = self.search_sale_line_item(code)
