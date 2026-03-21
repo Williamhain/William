@@ -2,6 +2,8 @@ from datetime import date, datetime
 from pos.product import Product
 from pos.sale import Sale
 from pos.sale_line_item import SaleLineItem
+from pos.dao.product_dao_json import ProductDAOJSON
+from pos.dao.sale_dao_pickle import SaleDAOPickle
 from pos.exception.illegal_access_exception import IllegalAccessException
 from pos.exception.illegal_operation_exception import IllegalOperationException
 from pos.exception.invalid_product_exception import InvalidProductException
@@ -56,8 +58,8 @@ class Controller():
 		self.password = None
 		self.logged = False
 
-		self.products = {}
-		self.sales = {}
+		self.product_dao = ProductDAOJSON()
+		self.sale_dao = SaleDAOPickle(self)
 		self.current_sale = None
 		self.sales_counter = 0
 
@@ -132,7 +134,7 @@ class Controller():
 		# must be logged in to do operation
 		if not self.logged:
 			raise IllegalAccessException("User must be logged in to search products.")
-		return self.products.get(upc)
+		return self.product_dao.search_product(upc)
 
 	def create_product(self, upc, description, price):
 		"""
@@ -158,12 +160,12 @@ class Controller():
 		if not self.logged:
 			raise IllegalAccessException("User must be logged in to create products.")
 		# product already exists, do not create them
-		if self.products.get(upc):
+		if self.product_dao.search_product(upc):
 			raise IllegalOperationException()
 
 		# finally, create a new product
 		product = Product(upc, description, price)
-		self.products[upc] = product
+		self.product_dao.create_product(product)
 		return product
 
 	def retrieve_products(self, description):
@@ -184,12 +186,14 @@ class Controller():
  		# must be logged in to do operation
 		if not self.logged:
 			raise IllegalAccessException("User must be logged in to retrieve products.")
+		
+		return self.product_dao.retrieve_products(description)
 
-		retrieved_products = []
-		for product in self.products.values():
-			if description in product.description:
-				retrieved_products.append(product)
-		return retrieved_products
+		#retrieved_products = []
+		#for product in self.products.values():
+		#	if description in product.description:
+		#		retrieved_products.append(product)
+		#return retrieved_products
 
 	def update_product(self, original_upc, upc, description, price):
 		"""
@@ -217,7 +221,7 @@ class Controller():
 			raise IllegalAccessException("User must be logged in to update products.")
 
 		# first, search the product by key
-		product = self.products.get(original_upc)
+		product = self.product_dao.search_product(original_upc)
 
 		# product does not exist, cannot update
 		if not product:
@@ -228,13 +232,16 @@ class Controller():
 		product.price = price
 
 		# treat different keys as a separate case
-		if original_upc != upc:
-			if self.products.get(upc):
-				raise IllegalOperationException("Cannot update: A product with the new UPC already exists.")
-			self.products.pop(original_upc)
-			product.upc = upc
-			self.products[upc] = product
 
+
+		if original_upc != upc:
+			if self.product_dao.search_product(upc):
+				raise IllegalOperationException("Cannot update: A product with the new UPC already exists.")
+			self.product_dao.delete_product(original_upc)
+			product.upc = upc
+			self.product_dao.create_product(product)
+		else:
+			self.product_dao.update_product(original_upc, product)
 		return True
 			
 	def delete_product(self, upc):
@@ -257,14 +264,14 @@ class Controller():
 			raise IllegalAccessException("User must be logged in to delete products.")
 
 		# first, search the product by key
-		product = self.products.get(upc)
+		product = self.product_dao.search_product(upc)
 
 		# product does not exist, cannot delete
 		if not product:
 			raise IllegalOperationException()
 
 		# product exists, delete product
-		self.products.pop(upc)
+		self.product_dao.delete_product(upc)
 		return True
 	
 	def list_products(self):
@@ -281,10 +288,12 @@ class Controller():
 		if not self.logged:
 			raise IllegalAccessException("User must be logged in to list products.")
 
-		products_list = []
-		for product in self.products.values():
-			products_list.append(product)
-		return products_list
+		return self.product_dao.list_products()
+	
+		#products_list = []
+		#for product in self.products.values():
+		#	products_list.append(product)
+		#return products_list
 
 	def add_sale(self, sale):
 		"""
@@ -301,7 +310,7 @@ class Controller():
 		"""
 
 		self.sales_counter += 1
-		self.sales[sale.id] = sale
+		self.sale_dao.create_sale(sale)
 
 	def search_sale(self, id):
 		"""
@@ -322,7 +331,7 @@ class Controller():
 		if not self.logged:
 			raise IllegalAccessException()
 
-		return self.sales.get(id)
+		return self.sale_dao.search_sale(id)
 
 	def list_sales(self):
 		"""
@@ -338,10 +347,12 @@ class Controller():
 		if not self.logged:
 			raise IllegalAccessException()
 
-		sales_list = []
-		for sale in self.sales.values():
-			sales_list.append(sale)
-		return sales_list
+		return self.sale_dao.list_sales()
+
+		#sales_list = []
+		#for sale in self.sales.values():
+		#	sales_list.append(sale)
+		#return sales_list
 
 	def initiate_sale(self):
 		"""
@@ -457,7 +468,7 @@ class Controller():
 		self.current_sale.customer_total = round(self.current_sale.total + self.current_sale.gst + self.current_sale.pst, 2)
 
 		# add the current sale to the sales collection
-		self.sales[self.current_sale.id] = self.current_sale		
+		self.sale_dao.create_sale(self.current_sale)	
 		
 		# print the sale receipt, finish current sale and return the sale with success
 		self.current_sale.set_sale_receipt(self.print_sale_receipt())
@@ -482,7 +493,7 @@ class Controller():
 		
 		# there is no current sale to be printed, cannot print
 		if not self.current_sale:
-			raise NoCurrentSaleException
+			raise NoCurrentSaleException()
 		
 		# cannot print current sale with no sale line items
 		if self.current_sale.get_number_sale_line_items() == 0:

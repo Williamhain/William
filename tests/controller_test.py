@@ -1,33 +1,42 @@
 from unittest import TestCase
 from unittest import main
+from datetime import date, datetime
 from pos.controller import Controller
 from pos.product import Product
 from pos.sale import Sale
 from pos.sale_line_item import SaleLineItem
-from datetime import date, datetime
+from pos.configuration import Configuration
+from pos.exception.invalid_login_exception import InvalidLoginException
+from pos.exception.duplicate_login_exception import DuplicateLoginException
+from pos.exception.invalid_logout_exception import InvalidLogoutException
+from pos.exception.illegal_access_exception import IllegalAccessException
+from pos.exception.illegal_operation_exception import IllegalOperationException
+from pos.exception.no_current_sale_exception import NoCurrentSaleException
+from pos.exception.invalid_product_exception import InvalidProductException
 
 class ControllerTest(TestCase):
 
 	def setUp(self):
+		# set autosave to False to ignore testing persistence
+		self.configuration = Configuration()
+		self.configuration.__class__.autosave = False
 		self.controller = Controller()
 
 
 	def test_login_logout(self):
-
-		self.assertFalse(self.controller.logout(), "log out only after being logged in")
-
-		self.assertFalse(self.controller.login("theuser", "pos2026"), "login in with incorrect username")
-
-		self.assertFalse(self.controller.login("user", "123456"), "login in with incorrect password")
-
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
-
-		self.assertFalse(self.controller.login("user", "pos2026"), "cannot login again while still logged in")
-
+		with self.assertRaises(InvalidLogoutException, msg="log out only after being logged in"):
+			self.controller.logout()
+		with self.assertRaises(InvalidLoginException, msg="login in with incorrect username"):
+			self.controller.login("incorrectuser", "123456")
+		with self.assertRaises(InvalidLoginException, msg="login in with incorrect password"):
+			self.controller.login("user", "abadpassword")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
+		with self.assertRaises(DuplicateLoginException, msg="cannot login again while still logged in"):
+			self.controller.login("user", "123456")
 		self.assertTrue(self.controller.logout(), "log out correctly")
-
-		self.assertTrue(self.controller.login("user", "pos2026"), "can login again")
-
+		self.assertTrue(self.controller.login("user", "123456"), "can login again")
+		self.assertTrue(self.controller.logout(), "can log out again")
+		self.assertTrue(self.controller.login("ali", "@G00dPassw0rd"), "another user logging in")
 		self.assertTrue(self.controller.logout(), "can log out again")
 
 
@@ -38,11 +47,13 @@ class ControllerTest(TestCase):
 		expected_product_3 = Product("000000003294", "BC Jazz Apple per kg", 5.93)
 
 		# cannot do operation without logging in
-		self.assertIsNone(self.controller.create_product("037466022680", "Lindt Excellence Orange", 4.99), 
-			"cannot create product without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot search product without logging in"):
+			self.controller.search_product("037466022680")
+		with self.assertRaises(IllegalAccessException, msg="cannot create product without logging in"):
+			self.controller.create_product("037466022680", "Lindt Excellence Orange", 4.99)
 
 		# add one product
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 		actual_product = self.controller.create_product("037466022680", "Lindt Excellence Orange", 4.99)
 		self.assertIsNotNone(actual_product, "product created cannot be null")
 
@@ -54,9 +65,9 @@ class ControllerTest(TestCase):
 		self.assertIsNotNone(actual_product, "product created and retrieved cannot be null")
 		self.assertEqual(expected_product_1, actual_product, "Lindt Excellence Orange product was created, retrieved and its data are correct")
 
-		# should not allow to create another product with same id
-		actual_product = self.controller.create_product("037466022680", "Kicking Horse Coffee", 18.99)
-		self.assertIsNone(actual_product, "cannot create product with same id as from an existing product")
+		# should not allow to create another product with same upc
+		with self.assertRaises(IllegalOperationException, msg="cannot create product with same upc that is already registered"):
+			self.controller.create_product("037466022680", "Kicking Horse Coffee", 18.99)
 
 		# add a second product
 		actual_product = self.controller.create_product("629070500083", "Kicking Horse Coffee", 18.99)
@@ -92,10 +103,11 @@ class ControllerTest(TestCase):
 		expected_product_5 = Product("065684112241", "Liberte Strawberry Yogurt", 5.49)
 
 		# cannot do operation without logging in
-		self.assertIsNone(self.controller.retrieve_products("Lindt Excellence Orange"), "cannot retrieve products without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot retrieve products without logging in"):
+			self.controller.retrieve_products("Lindt Excellence Orange")
 
 		# login and create some products
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 		self.controller.create_product("037466022680", "Lindt Excellence Orange", 4.99)
 		self.controller.create_product("629070500083", "Kicking Horse Coffee", 18.99)
 		self.controller.create_product("000000003294", "BC Jazz Apple per kg", 5.93)
@@ -128,15 +140,15 @@ class ControllerTest(TestCase):
 		expected_product_5 = Product("065684112241", "Liberte Strawberry Yogurt", 5.49)
 
 		# cannot do operation without logging in
-		self.assertFalse(self.controller.update_product("037466022680", "037466022680", "Lindt Excellence Orange", 5.49), 
-			"cannot update product without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot update product without logging in"):
+			self.controller.update_product("037466022680", "037466022680", "Lindt Excellence Orange", 5.49)
 
 		# login
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 
 		# try to update a product when there are no products in the system
-		self.assertFalse(self.controller.update_product("037466022680", "037466022680", "Lindt Excellence Orange", 5.49),
-			"cannot update product when there are no products in the system")
+		with self.assertRaises(IllegalOperationException, msg="cannot update product when there are no products in the system"):
+			self.controller.update_product("037466022680", "037466022680", "Lindt Excellence Orange", 5.49)
 
 		# create some products
 		self.controller.create_product("037466022680", "Lindt Excellence Orange", 4.99)
@@ -145,25 +157,25 @@ class ControllerTest(TestCase):
 		self.controller.create_product("743434011289", "Lindt Excellence Raspberry", 4.99)
 		self.controller.create_product("065684112241", "Liberte Strawberry Yogurt", 5.49)
 
-		# update one product, but keep the Product key (id) unchanged
+		# update one product, but keep the Product key (UPC) unchanged
 		self.assertTrue(self.controller.update_product("037466022680", "037466022680", "Lindt Excellence Orange The Best", 5.49), 
-			"update product data and keep the id unchanged")
+			"update product data and keep the UPC unchanged")
 		actual_product = self.controller.search_product("037466022680")
 		self.assertNotEqual(expected_product_1, actual_product, "product has updated data, cannot be equal to the original data")
 		expected_product_3a = Product("037466022680", "Lindt Excellence Orange The Best", 5.49)
 		self.assertEqual(expected_product_3a, actual_product, "product was updated, its data have to be updated and correct")
 
-		# update one product, and change the Product key (id) as well
+		# update one product, and change the Product key (UPC) as well
 		self.assertTrue(self.controller.update_product("065684112241", "165684112242", "Liberte Strawberry Yogurt New", 5.99), 
-			"update product data and also change the id")
+			"update product data and also change the UPC")
 		actual_product = self.controller.search_product("165684112242")
 		self.assertNotEqual(expected_product_5, actual_product, "product has updated data, cannot be equal to the original data")
 		expected_product_5a = Product("165684112242", "Liberte Strawberry Yogurt New", 5.99)
 		self.assertEqual(expected_product_5a, actual_product, "product was updated, its data have to be updated and correct")
 
-		# update one product with a conflicting existing id
-		self.assertFalse(self.controller.update_product("037466022680", "629070500083", "Lindt Excellence Orange The Best", 5.49), 
-			"cannot update product and give it a registered id")
+		# update one product with a conflicting existing UPC
+		with self.assertRaises(IllegalOperationException, msg="cannot update product and give it a registered UPC"):
+			self.controller.update_product("037466022680", "629070500083", "Lindt Excellence Orange The Best", 5.49)
 
 
 	def test_delete_product(self):
@@ -175,13 +187,15 @@ class ControllerTest(TestCase):
 		expected_product_5 = Product("065684112241", "Liberte Strawberry Yogurt", 5.49)
 
 		# cannot do operation without logging in
-		self.assertFalse(self.controller.delete_product("037466022680"), "cannot delete product without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot delete product without logging in"):
+			self.controller.delete_product("037466022680")
 
 		# login
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 
 		# try to delete a product when there are no products in the system
-		self.assertFalse(self.controller.delete_product("037466022680"), "cannot delete product when there are no products in the system")
+		with self.assertRaises(IllegalOperationException, msg="cannot delete product when no products are registered"):
+			self.controller.delete_product("037466022680")
 
 		# add some products
 		self.controller.create_product("037466022680", "Lindt Excellence Orange", 4.99)
@@ -212,10 +226,11 @@ class ControllerTest(TestCase):
 		expected_product_5 = Product("065684112241", "Liberte Strawberry Yogurt", 5.49)
 
 		# cannot do operation without logging in
-		self.assertIsNone(self.controller.list_products(), "cannot list products without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot list products without logging in"):
+			self.controller.list_products()
 
 		# login
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 
 		# listing products when there are no products in the system
 		products_list = self.controller.list_products()
@@ -274,13 +289,14 @@ class ControllerTest(TestCase):
 		self.controller.add_sale(sale4)
 
 		# cannot do operation without logging in
-		self.assertIsNone(self.controller.search_sale(1), "cannot search sale without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot search sale without logging in"):
+			self.controller.search_sale(1)
 
 		# login
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 
 		# search an inexistent sale
-		self.assertIsNone(self.controller.search_sale(23), "searching inexistent sale returns none")
+		self.assertIsNone(self.controller.search_sale(23), "searching inexistent sale returns None")
 
 		# search existing sales
 		self.assertEqual(sale1, self.controller.search_sale(1), "searching returns sale 1")
@@ -297,10 +313,11 @@ class ControllerTest(TestCase):
 		expected_sale5 = Sale(5, date(2026, 2, 23), 80.79, 4.03, 5.65, 90.47)
 		
 		# cannot do operation without logging in
-		self.assertIsNone(self.controller.list_sales(), "cannot search sale without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot list sales without logging in"):
+			self.controller.list_sales()
 
 		# login
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 
 		# inexistent sales lead to an empty sales list
 		actual_sales_list = self.controller.list_sales()
@@ -343,28 +360,32 @@ class ControllerTest(TestCase):
 		expected_initiated_sale = Sale(None, None, 0.00, 0.00, 0.00, 0.00)
 
 		# cannot do operation without logging in
-		self.assertFalse(self.controller.initiate_sale(), "cannot initiate sale without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot initiate sale without logging in"):
+			self.controller.initiate_sale()
 
 		# login
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 
 		# initiate sale correctly
 		self.assertTrue(self.controller.initiate_sale(), "sale initiated")
 		self.assertEqual(expected_initiated_sale, self.controller.get_current_sale(), "initiated sale must be have zero values and no id or date")
 		
 		# cannot initiate sale if there is a current sale in progress
-		self.assertFalse(self.controller.initiate_sale(), "cannot initiate sale with a sale in progress")
+		with self.assertRaises(IllegalOperationException, msg="cannot initiate sale with a sale in progress"):
+			self.controller.initiate_sale()
 
 
 	def test_cancel_current_sale(self):
 		# cannot do operation without logging in
-		self.assertFalse(self.controller.cancel_current_sale(), "cannot cancel sale without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot cancel sale without logging in"):
+			self.controller.cancel_current_sale()
 
 		# login
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 
 		# cannot cancel sale without initiating it first
-		self.assertFalse(self.controller.cancel_current_sale())
+		with self.assertRaises(NoCurrentSaleException, msg="cannot cancel sale without initiating it first"):
+			self.controller.cancel_current_sale()
 
 		# initiate sale correctly
 		self.assertTrue(self.controller.initiate_sale(), "sale initiated")
@@ -382,19 +403,22 @@ class ControllerTest(TestCase):
 		expected_sale_line_item_3 = SaleLineItem(3, 1.5, 5.93, "000000003294")
 
 		# cannot do operation without logging in
-		self.assertIsNone(self.controller.add_new_sale_line_item(2, "037466022680"), "cannot add new sale line item without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot add new sale line item without logging in"):
+			self.controller.add_new_sale_line_item(2, "037466022680")
 
 		# login
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 
 		# cannot do operation without a valid current sale
-		self.assertIsNone(self.controller.add_new_sale_line_item(2, "037466022680"), "cannot add sale new line item without a valid current sale")
+		with self.assertRaises(NoCurrentSaleException, msg="cannot add sale new line item without a valid current sale"):
+			self.controller.add_new_sale_line_item(2, "037466022680")
 
 		# initiate sale
 		self.controller.initiate_sale()
 
 		# cannot add a new line item if the product is not registered in the system
-		self.assertIsNone(self.controller.add_new_sale_line_item(2, "037466022680"), "cannot add sale new line item without an existing product")
+		with self.assertRaises(InvalidProductException, msg="cannot add sale new line item with an inexisting product"):
+			self.controller.add_new_sale_line_item(2, "037466022680")
 
 		# add new line item successfully
 		self.controller.create_product("037466022680", "Lindt Excellence Orange", 4.99)
@@ -420,10 +444,11 @@ class ControllerTest(TestCase):
 		expected_sale_3 = Sale(3, datetime.now().date(), 37.86, 1.89, 2.65, 42.40)
 
 		# cannot do operation without logging in
-		self.assertIsNone(self.controller.finish_current_sale(), "cannot finish current sale without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot finish current sale without logging in"):
+			self.controller.finish_current_sale()
 
 		# login
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 
 		# add some products to the system
 		self.controller.create_product("037466022680", "Lindt Excellence Orange", 4.99)
@@ -431,13 +456,15 @@ class ControllerTest(TestCase):
 		self.controller.create_product("000000003294", "BC Jazz Apple per kg", 5.93)
 
 		# cannot do operation without a valid current sale
-		self.assertIsNone(self.controller.finish_current_sale(), "cannot finish current sale without a valid current sale")
+		with self.assertRaises(NoCurrentSaleException, msg="cannot finish sale without a valid current sale"):
+			self.controller.finish_current_sale()
 
 		# initiate first sale
 		self.controller.initiate_sale()
 
 		# cannot finish sale with no sale line items
-		self.assertIsNone(self.controller.finish_current_sale(), "cannot finish current sale without adding at least one sale line item")
+		with self.assertRaises(IllegalOperationException, msg="cannot finish current sale without adding at least one sale line item"):
+			self.controller.finish_current_sale()
 
 		# finish first sale after adding one new line item
 		self.controller.add_new_sale_line_item(2, "037466022680")
@@ -522,10 +549,11 @@ PST (7%)                                         -   2.65
 TOTAL SALE                                       -  42.40
 '''
 		# cannot do operation without logging in
-		self.assertIsNone(self.controller.print_sale_receipt(), "cannot print sale receipt without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot print sale receipt without logging in"):
+			self.controller.print_sale_receipt()
 
 		# login
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 
 		# add some products to the system
 		self.controller.create_product("037466022680", "Lindt Excellence Orange", 4.99)
@@ -533,7 +561,8 @@ TOTAL SALE                                       -  42.40
 		self.controller.create_product("000000003294", "BC Jazz Apple per kg", 5.93)
 
 		# cannot do operation without a valid current sale
-		self.assertIsNone(self.controller.print_sale_receipt(), "cannot print sale receipt without a valid current sale")
+		with self.assertRaises(NoCurrentSaleException, msg="cannot print sale receipt without a valid current sale"):
+			self.controller.print_sale_receipt()
 
 		# initiate first sale
 		self.controller.initiate_sale()
@@ -578,13 +607,17 @@ TOTAL SALE                                       -  42.40
 		expected_sale_line_item_3 = SaleLineItem(3, 1.5, 5.93, "000000003294")
 
 		# cannot do operation without logging in
-		self.assertIsNone(self.controller.create_sale_line_item(2, 4.99, "037466022680"), "cannot add sale line item without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot add sale line item without logging in"):
+			self.controller.create_sale_line_item(2, 4.99, "037466022680")
 
 		# login
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 
 		# cannot do operation without a valid current sale
-		self.assertIsNone(self.controller.create_sale_line_item(2, 4.99, "037466022680"), "cannot add sale line item without a valid current sale")
+		with self.assertRaises(NoCurrentSaleException, msg="cannot search sale line item without a valid current sale"):
+			self.controller.search_sale_line_item(1)
+		with self.assertRaises(NoCurrentSaleException, msg="cannot create sale line item without a valid current sale"):
+			self.controller.create_sale_line_item(2, 4.99, "037466022680")
 
 		# initiate sale
 		self.controller.initiate_sale()
@@ -637,13 +670,15 @@ TOTAL SALE                                       -  42.40
 		expected_sale_line_item_3_print = "BC Jazz Apple per kg           -   1.50 x   5.93 -   8.89\n"
 
 		# cannot do operation without logging in
-		self.assertIsNone(self.controller.print_sale_line_item(1), "cannot list a sale line item for a sale without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot list a sale line item for a sale without logging in"):
+			self.controller.print_sale_line_item(1)
 
 		# login
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 
 		# cannot do operation without a valid current sale
-		self.assertIsNone(self.controller.print_sale_line_item(1), "cannot list a sale line item when there are no sales in the system")
+		with self.assertRaises(NoCurrentSaleException, msg="cannot list a sale line item with no valid current sale"):
+			self.controller.print_sale_line_item(1)
 
 		# add some products to the system
 		self.controller.create_product("037466022680", "Lindt Excellence Orange", 4.99)
@@ -683,13 +718,15 @@ TOTAL SALE                                       -  42.40
 		expected_sale_line_item_5_print = "Liberte Strawberry Yogurt      -   4.00 x   5.49 -  21.96\n"
 
 		# cannot do operation without logging in
-		self.assertIsNone(self.controller.print_sale_line_items(), "cannot list sale line items for a sale without logging in")
+		with self.assertRaises(IllegalAccessException, msg="cannot list sale line items without logging in"):
+			self.controller.print_sale_line_items()
 
 		# login
-		self.assertTrue(self.controller.login("user", "pos2026"), "login correctly")
+		self.assertTrue(self.controller.login("user", "123456"), "login correctly")
 
 		# cannot do operation without a valid current sale
-		self.assertIsNone(self.controller.print_sale_line_items(), "cannot list sale line items when there is no current sale")
+		with self.assertRaises(NoCurrentSaleException, msg="cannot list sale line items when there is no current sale"):
+			self.controller.print_sale_line_items()
 
 		# add some products to the system
 		self.controller.create_product("037466022680", "Lindt Excellence Orange", 4.99)
