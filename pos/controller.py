@@ -76,6 +76,12 @@ class Controller():
 		self.current_sale = None
 		self.sales_counter = 0
 
+	def get_password_hash(self, password):
+		encoded_password = password.encode('utf-8') #converts string to bytes for hashing purposes
+		hash_object = hashlib.sha256(encoded_password) #create sha-256 hash object using the created bytes
+		hex_dig = hash_object.hexdigest() #converts hash to readable hex string
+		return hex_dig #returns the final hashed password
+
 	def login(self, username, password):
 		"""
 		Authenticate a user and log them into the system.
@@ -94,17 +100,18 @@ class Controller():
 		"""
 		if self.logged:
 			raise DuplicateLoginException()
-		if username in self.users:
-			password_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
-			if password_hash == self.users[username]:
-				self.username = username
-				self.password = password
-				self.logged = True
-				return True
-			else:
-				raise InvalidLoginException()
-		else:
+		
+		if username not in self.users:
 			raise InvalidLoginException()
+		
+		password_hash = self.get_password_hash(password) # convert the password into hash value
+		if self.users.get(username) != password_hash:
+			raise InvalidLoginException() # incorrect password
+
+		self.username = username
+		self.password = password_hash
+		self.logged = True
+		return True
 			
 	def logout(self):
 		"""
@@ -672,9 +679,4 @@ class Controller():
 
 		return self.sales_counter
 	
-	def get_password_hash(self, password):
-		encoded_password = password.encode('utf-8') #converts string to bytes for hashing purposes
-		hash_object = hashlib.sha256(encoded_password) #create sha-256 hash object using the created bytes
-		hex_dig = hash_object.hexdigest() #converts hash to readable hex string
-		return hex_dig #returns the final hashed password
 
