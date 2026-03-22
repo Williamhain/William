@@ -1,12 +1,30 @@
 # product_dao_json.py
-
+import os
+import json
 from pos.dao.product_dao import ProductDAO
+from pos.dao.product_encoder import ProductEncoder
+from pos.dao.product_decoder import ProductDecoder
+from pos.configuration import Configuration
 
 class ProductDAOJSON(ProductDAO):
 
     # initialize product dictionary
     def __init__(self):
         self.products = {}
+        self.autosave = Configuration.autosave
+        self.filename = Configuration.products_file
+
+        if self.autosave and os.path.exists(self.filename):
+                with open(self.filename, "r") as f:
+                    # using cls=ProductDecoder to match the class inheritance
+                    product_list = json.load(f, cls=ProductDecoder)
+                    for product in product_list:
+                        self.products[product.upc] = product
+
+    def save_to_file(self):
+        if self.autosave:
+            with open(self.filename, "w") as f:
+                json.dump(list(self.products.values()), f, cls=ProductEncoder)
 
     # Returns product along with its respective key if found, otherwise returns None
     def search_product(self, key):
@@ -18,6 +36,7 @@ class ProductDAOJSON(ProductDAO):
             return False
         else:
             self.products[product.upc] = product
+            self.save_to_file()
             return True
     
     # Returns a list of products that have descriptions that contain the search string
@@ -36,6 +55,7 @@ class ProductDAOJSON(ProductDAO):
             return False
         else: 
             self.products[key] = product
+            self.save_to_file()
             return True
     
     # returns False if product to be deleted is not in the dictionary, otherwise, removes the product by UPC
@@ -44,6 +64,7 @@ class ProductDAOJSON(ProductDAO):
             return False
         else:
             self.products.pop(key)
+            self.save_to_file()
             return True
     
     # returns a list of all of the products
