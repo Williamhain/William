@@ -56,7 +56,7 @@ class Controller():
 				for line in f:
 					line = line.strip()
 					if line:
-						parts = line.split() 
+						parts = line.split(',') 
 						if len(parts) >= 2:
 							self.users[parts[0]] = parts[1]
 		else:
@@ -71,10 +71,11 @@ class Controller():
 		self.password = None
 		self.logged = False
 
-		self.product_dao = ProductDAOJSON()
-		self.sale_dao = SaleDAOPickle(self)
 		self.current_sale = None
 		self.sales_counter = 0
+		self.product_dao = ProductDAOJSON()
+		self.sale_dao = SaleDAOPickle(self)
+	
 
 	def get_password_hash(self, password):
 		encoded_password = password.encode('utf-8') #converts string to bytes for hashing purposes
