@@ -32,13 +32,17 @@ class SaleDAOPickle(SaleDAO):
     # adds a new sale using ID as key to the sales dictionary
     def create_sale(self, sale):
         self.sales[sale.id] = sale
+        self.save_changes() 
         
 
     # Returns a list of all sales
     def list_sales(self):
         return list(self.sales.values())
     
+    #saving
     def save_changes(self):
-        pass
-    
-
+        if self.autosave:
+            with open(self.filename, "wb") as f: # write binary to overwrite the file
+                pickle.dump(self.sales, f) #write the sales dictionary to the file
+        else:
+            pass # no autosave
