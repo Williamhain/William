@@ -13,6 +13,7 @@ from pos.exception.invalid_logout_exception import InvalidLogoutException
 from pos.exception.no_current_sale_exception import NoCurrentSaleException
 
 import hashlib
+import os
 
 class Controller():
 	"""
@@ -46,13 +47,25 @@ class Controller():
 		-------
 		None
 		"""
-		self.autosave = autosave
-		# hard code users passwords in, change later
-		self.users = {
-			"user": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
-			"ali": "6394ffec21517605c1b426d43e6fa7eb0cff606ded9c2956821c2c36bfee2810",
-			"kala": "e5268ad137eec951a48a5e5da52558c7727aaa537c8b308b5e403e6b434e036e"
-		}
+		from pos.configuration import Configuration
+		self.autosave = autosave or Configuration.autosave
+		self.users = {}
+		
+		if self.autosave and os.path.exists(Configuration.users_file):
+			with open(Configuration.users_file, "r") as f:
+				for line in f:
+					line = line.strip()
+					if line:
+						parts = line.split() 
+						if len(parts) >= 2:
+							self.users[parts[0]] = parts[1]
+		else:
+			# hard code users passwords in, change later
+			self.users = {
+				"user": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+				"ali": "6394ffec21517605c1b426d43e6fa7eb0cff606ded9c2956821c2c36bfee2810",
+				"kala": "e5268ad137eec951a48a5e5da52558c7727aaa537c8b308b5e403e6b434e036e"
+			}
 
 		self.username = None
 		self.password = None
@@ -81,18 +94,17 @@ class Controller():
 		"""
 		if self.logged:
 			raise DuplicateLoginException()
-		
-		if username not in self.users:
+		if username in self.users:
+			password_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
+			if password_hash == self.users[username]:
+				self.username = username
+				self.password = password
+				self.logged = True
+				return True
+			else:
+				raise InvalidLoginException()
+		else:
 			raise InvalidLoginException()
-		
-		password_hash = self.get_password_hash(password) # convert the password into hash value
-		if self.users.get(username) != password_hash:
-			raise InvalidLoginException() # incorrect password
-
-		self.username = username
-		self.password = password_hash
-		self.logged = True
-		return True
 			
 	def logout(self):
 		"""
@@ -109,12 +121,10 @@ class Controller():
 		"""
 		if not self.logged:
 			raise InvalidLogoutException()
-		else:
-			self.username = None
-			self.password = None
-			self.logged = False
-			self.current_sale = None
-			return True
+		self.username = self.password = None
+		self.logged = False
+		self.current_sale = None
+		return True
 
 	def search_product(self, upc):
 		"""
