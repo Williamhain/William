@@ -14,6 +14,9 @@ class SaleDAOPickle(SaleDAO):
         self.autosave = Configuration.autosave
         self.filename = Configuration.sales_file
 
+        self.load_from_file()
+
+    def load_from_file(self):
         # loads sales from file if autosave is on and if file eists
         if self.autosave and os.path.exists(self.filename):
             with open(self.filename, "rb") as f: # read binary for pickle
