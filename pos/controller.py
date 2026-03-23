@@ -51,7 +51,7 @@ class Controller():
 		self.autosave = autosave or Configuration.autosave
 		self.users = {}
 		
-		#comments
+		# load users from file if autosave is enabled; otherwise use default hardcoded users
 		if self.autosave and os.path.exists(Configuration.users_file):
 			with open(Configuration.users_file, "r") as f:
 				for line in f:
@@ -76,7 +76,7 @@ class Controller():
 		self.product_dao = ProductDAOJSON()
 		self.sale_dao = SaleDAOPickle(self)
 	
-	#comments
+	# hashes a plaintext password using SHA-256 for secure authentication
 	def get_password_hash(self, password):
 		encoded_password = password.encode('utf-8') #converts string to bytes for hashing purposes
 		hash_object = hashlib.sha256(encoded_password) #create sha-256 hash object using the created bytes

@@ -7,7 +7,7 @@ class ProductDecoder(json.JSONDecoder):
         #pass the custom object_hook to the parent JSONDecoder class
         super().__init__(object_hook=self.object_hook, *args, **kwargs)
 
-    #comments
+    # converts parsed JSON dictionaries back into Product objects
     def object_hook(self, obj):
         #check if the dictionary represents a Product
         if "__type__" in obj and obj["__type__"] == "Product":

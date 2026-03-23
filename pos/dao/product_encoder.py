@@ -4,7 +4,7 @@ from pos.product import Product
 
 class ProductEncoder(json.JSONEncoder):
 
-    #comments
+    # converts Product objects into JSON-serializable dictionaries
     def default(self, obj):
         if isinstance(obj, Product):
             return {
