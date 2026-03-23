@@ -3,6 +3,8 @@ import json
 from pos.product import Product
 
 class ProductEncoder(json.JSONEncoder):
+
+    #comments
     def default(self, obj):
         if isinstance(obj, Product):
             return {

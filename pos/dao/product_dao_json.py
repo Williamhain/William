@@ -14,6 +14,7 @@ class ProductDAOJSON(ProductDAO):
         self.autosave = Configuration.autosave
         self.filename = Configuration.products_file
 
+        # Comments
         if self.autosave and os.path.exists(self.filename):
                 with open(self.filename, "r") as f:
                     # using cls=ProductDecoder to match the class inheritance
@@ -21,6 +22,7 @@ class ProductDAOJSON(ProductDAO):
                     for product in product_list:
                         self.products[product.upc] = product
 
+    # Comments 
     def save_to_file(self):
         if self.autosave:
             with open(self.filename, "w") as f:

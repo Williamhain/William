@@ -14,7 +14,7 @@ class SaleDAOPickle(SaleDAO):
         self.autosave = Configuration.autosave
         self.filename = Configuration.sales_file
 
-        #loading
+        # loads sales from file if autosave is on and if file eists
         if self.autosave and os.path.exists(self.filename):
             with open(self.filename, "rb") as f: # read binary for pickle
                 self.sales = pickle.load(f) # load the sales dictionary from the file
@@ -39,10 +39,10 @@ class SaleDAOPickle(SaleDAO):
     def list_sales(self):
         return list(self.sales.values())
     
-    #saving
+    # saves sales to files using pickle if autosave is on
     def save_changes(self):
         if self.autosave:
             with open(self.filename, "wb") as f: # write binary to overwrite the file
                 pickle.dump(self.sales, f) #write the sales dictionary to the file
         else:
-            pass # no autosave
+            pass # no autosave, do nothing
