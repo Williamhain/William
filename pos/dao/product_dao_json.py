@@ -1,79 +1,86 @@
-# product_dao_json.py
 import os
-import json
+from pos.configuration import Configuration
 from pos.dao.product_dao import ProductDAO
+from pos.product import Product
+
 from pos.dao.product_encoder import ProductEncoder
 from pos.dao.product_decoder import ProductDecoder
-from pos.configuration import Configuration
+from json import loads, dumps
 
 class ProductDAOJSON(ProductDAO):
 
-    # initialize product dictionary
-    def __init__(self):
-        self.products = {}
-        self.autosave = Configuration.autosave
-        self.filename = Configuration.products_file
+	def __init__(self):
+		self.configuration = Configuration()
+		self.autosave = self.configuration.__class__.autosave
+		self.filename = self.configuration.__class__.products_file
 
-        self.load_from_file()
+		if self.autosave:
 
-    # reads the JSON file from the disk and populates the products dictionary.
-    def load_from_file(self):
-        if self.autosave and os.path.exists(self.filename):
-                with open(self.filename, "r") as f:
-                    # using cls=ProductDecoder to match the class inheritance
-                    product_list = json.load(f, cls=ProductDecoder)
-                    for product in product_list:
-                        self.products[product.upc] = product
+			self.products = {}
+			try:
+				with open(self.filename, 'r') as file:
+					for product_json in file:
+						product = loads(product_json, cls=ProductDecoder)
+						 
+						self.products[product.upc] = product
+			except:
+				pass
+		else:
+			self.products = {}
 
-    # serializes the current products dictionary and writes it to the JSON file.
-    def save_to_file(self):
-        if self.autosave:
-            with open(self.filename, "w") as f:
-                json.dump(list(self.products.values()), f, cls=ProductEncoder)
+	def search_product(self, key):
+		return self.products.get(key)
 
-    # Returns product along with its respective key if found, otherwise returns None
-    def search_product(self, key):
-        return self.products.get(key)
-    
-    # Returns False if product with the same UPC already exists, otherwise creates a new product with associated UPC
-    def create_product(self, product):
-        if product.upc in self.products:
-            return False
-        else:
-            self.products[product.upc] = product
-            self.save_to_file()
-            return True
-    
-    # Returns a list of products that have descriptions that contain the search string
-    def retrieve_products(self, search_string):
-        product_list = []
+	def create_product(self, product):
+		self.products[product.upc] = product
 
-        for product in self.products.values():
-            if search_string in product.description:
-                product_list.append(product)
+		# if persistence is set, save all products
+		if self.autosave:
+			with open(self.filename, 'w') as file:
+				for key in self.products:
+					product_json = dumps(self.products[key], cls=ProductEncoder)
+					file.write('%s\n' % (product_json))
 
-        return product_list
-    
-    # Returns False if product to be updated is not in the dictionary, otherwise, updates a product by UPC 
-    def update_product(self, key, product):
-        if key not in self.products:
-            return False
-        else: 
-            self.products[key] = product
-            self.save_to_file()
-            return True
-    
-    # returns False if product to be deleted is not in the dictionary, otherwise, removes the product by UPC
-    def delete_product(self, key):
-        if key not in self.products:
-            return False
-        else:
-            self.products.pop(key)
-            self.save_to_file()
-            return True
-    
-    # returns a list of all of the products
-    def list_products(self):
-        return list(self.products.values())
+		return product
 
+	def retrieve_products(self, search_string):
+		retrieved_products = []
+		for product in self.products.values():
+			if search_string in product.description:
+				retrieved_products.append(product)
+		return retrieved_products
 
+	def update_product(self, key, product):
+
+		# treat different keys as a separate case
+		if key != product.upc:
+			self.products.pop(key)
+		self.products[product.upc] = product
+
+		# if persistence is set, save all products
+		if self.autosave:
+			with open(self.filename, 'w') as file:
+				for key in self.products:
+					product_json = dumps(self.products[key], cls=ProductEncoder)
+					file.write('%s\n' % (product_json))
+
+		return True
+
+	def delete_product(self, key):
+		# product exists, delete product
+		self.products.pop(key)
+
+		# if persistence is set, save all products
+		if self.autosave:
+			with open(self.filename, 'w') as file:
+				for key in self.products:
+					product_json = dumps(self.products[key], cls=ProductEncoder)
+					file.write('%s\n' % (product_json))
+
+		return True
+
+	def list_products(self):
+		products_list = []
+		for product in self.products.values():
+			products_list.append(product)
+		return products_list

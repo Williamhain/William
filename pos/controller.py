@@ -1,19 +1,20 @@
+import hashlib
 from datetime import date, datetime
 from pos.product import Product
 from pos.sale import Sale
 from pos.sale_line_item import SaleLineItem
+from pos.configuration import Configuration
+from pos.dao.product_dao import ProductDAO
 from pos.dao.product_dao_json import ProductDAOJSON
+from pos.dao.sale_dao import SaleDAO
 from pos.dao.sale_dao_pickle import SaleDAOPickle
-from pos.exception.illegal_access_exception import IllegalAccessException
-from pos.exception.illegal_operation_exception import IllegalOperationException
-from pos.exception.invalid_product_exception import InvalidProductException
 from pos.exception.invalid_login_exception import InvalidLoginException
 from pos.exception.duplicate_login_exception import DuplicateLoginException
 from pos.exception.invalid_logout_exception import InvalidLogoutException
+from pos.exception.illegal_access_exception import IllegalAccessException
+from pos.exception.illegal_operation_exception import IllegalOperationException
 from pos.exception.no_current_sale_exception import NoCurrentSaleException
-
-import hashlib
-import os
+from pos.exception.invalid_product_exception import InvalidProductException
 
 class Controller():
 	"""
@@ -35,7 +36,7 @@ class Controller():
 		Internal counter used to assign unique identifiers to sales.
 	"""
 
-	def __init__(self, autosave=False):
+	def __init__(self):
 		"""
 		Initialize a new Controller instance.
 
@@ -47,41 +48,45 @@ class Controller():
 		-------
 		None
 		"""
-		from pos.configuration import Configuration
-		self.autosave = autosave or Configuration.autosave
-		self.users = {}
-		
-		# load users from file if autosave is enabled; otherwise use default hardcoded users
-		if self.autosave and os.path.exists(Configuration.users_file):
-			with open(Configuration.users_file, "r") as f:
-				for line in f:
-					line = line.strip()
-					if line:
-						parts = line.split(',') 
-						if len(parts) >= 2:
-							self.users[parts[0]] = parts[1]
-		else:
-			self.users = {
-				"user": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
-				"ali": "6394ffec21517605c1b426d43e6fa7eb0cff606ded9c2956821c2c36bfee2810",
-				"kala": "e5268ad137eec951a48a5e5da52558c7727aaa537c8b308b5e403e6b434e036e"
-			}
+		self.configuration = Configuration()
+		self.autosave = self.configuration.__class__.autosave
+		self.filename = self.configuration.__class__.users_file
 
 		self.username = None
 		self.password = None
 		self.logged = False
 
-		self.current_sale = None
-		self.sales_counter = 0
 		self.product_dao = ProductDAOJSON()
+
+		self.sales_counter = 0
 		self.sale_dao = SaleDAOPickle(self)
-	
-	# hashes a plaintext password using SHA-256 for secure authentication
+
+		self.current_sale = None
+
+		if self.autosave:
+			self.users = self.load_users()
+		else:
+			self.users = \
+			{"user":"8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92", \
+			"ali":"6394ffec21517605c1b426d43e6fa7eb0cff606ded9c2956821c2c36bfee2810", \
+			"kala":"e5268ad137eec951a48a5e5da52558c7727aaa537c8b308b5e403e6b434e036e"}
+
+
+	def load_users(self):
+		users = {}
+		with open(self.filename, 'r') as file:
+			for line in file:
+				tokens = line.strip().split(',')
+				users[tokens[0]] = tokens[1]
+		return users
+
+
 	def get_password_hash(self, password):
-		encoded_password = password.encode('utf-8') #converts string to bytes for hashing purposes
-		hash_object = hashlib.sha256(encoded_password) #create sha-256 hash object using the created bytes
-		hex_dig = hash_object.hexdigest() #converts hash to readable hex string
-		return hex_dig #returns the final hashed password
+		encoded_password = password.encode('utf-8')     # Convert the password to bytes
+		hash_object = hashlib.sha256(encoded_password)      # Choose a hashing algorithm (e.g., SHA-256)
+		hex_dig = hash_object.hexdigest()       # Get the hexadecimal digest of the hashed password
+		return hex_dig
+
 
 	def login(self, username, password):
 		"""
@@ -100,20 +105,19 @@ class Controller():
 			True if login succeeds; otherwise False.
 		"""
 		if self.logged:
-			raise DuplicateLoginException()
-		
-		if username not in self.users:
-			raise InvalidLoginException()
-		
-		password_hash = self.get_password_hash(password) # convert the password into hash value
-		if self.users.get(username) != password_hash:
-			raise InvalidLoginException() # incorrect password
+			raise DuplicateLoginException("Cannot login more than once in this system.")
+		if self.users.get(username):
+			password_hash = self.get_password_hash(password)
+			if password_hash == self.users.get(username):
+				self.username = username
+				self.password = password
+				self.logged = True
+				return True
+			else:
+				raise InvalidLoginException("Invalid username or password.")
+		else:
+			raise InvalidLoginException("Invalid username or password.")
 
-		self.username = username
-		self.password = password_hash
-		self.logged = True
-		return True
-			
 	def logout(self):
 		"""
 		Log out the current user and reset session state.
@@ -128,11 +132,13 @@ class Controller():
 			True if logout succeeds; otherwise False.
 		"""
 		if not self.logged:
-			raise InvalidLogoutException()
-		self.username = self.password = None
-		self.logged = False
-		self.current_sale = None
-		return True
+			raise InvalidLogoutException("Cannot logout without logging in first.")			
+		else:
+			self.username = None
+			self.password = None
+			self.logged = False
+			self.current_sale = None
+			return True
 
 	def search_product(self, upc):
 		"""
@@ -151,7 +157,8 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException("User must be logged in to search products.")
+			raise IllegalAccessException("Illegal Access: Must login first.")
+
 		return self.product_dao.search_product(upc)
 
 	def create_product(self, upc, description, price):
@@ -176,15 +183,16 @@ class Controller():
  
  		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException("User must be logged in to create products.")
+			raise IllegalAccessException("Illegal Access: Must login first.")
+
 		# product already exists, do not create them
-		if self.product_dao.search_product(upc):
-			raise IllegalOperationException()
+		if self.search_product(upc):
+			raise IllegalOperationException("Illegal Operation: Cannot add a product with an UPC that is already registered.")
 
 		# finally, create a new product
 		product = Product(upc, description, price)
-		self.product_dao.create_product(product)
-		return product
+		return self.product_dao.create_product(product)
+	
 
 	def retrieve_products(self, description):
 		"""
@@ -203,15 +211,9 @@ class Controller():
  
  		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException("User must be logged in to retrieve products.")
-		
-		return self.product_dao.retrieve_products(description)
+			raise IllegalAccessException("Illegal Access: Must login first.")
 
-		#retrieved_products = []
-		#for product in self.products.values():
-		#	if description in product.description:
-		#		retrieved_products.append(product)
-		#return retrieved_products
+		return self.product_dao.retrieve_products(description)
 
 	def update_product(self, original_upc, upc, description, price):
 		"""
@@ -236,31 +238,22 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException("User must be logged in to update products.")
+			raise IllegalAccessException("Illegal Access: Must login first.")
 
 		# first, search the product by key
-		product = self.product_dao.search_product(original_upc)
+		product = self.search_product(original_upc)
 
 		# product does not exist, cannot update
 		if not product:
-			raise IllegalOperationException()
+			raise IllegalOperationException("Illegal Operation: Cannot update an inexistent product.")
 
-		# product exists, update fields
-		product.description = description
-		product.price = price
-
-		# treat different keys as a separate case
-
-
+		# new upc is used by existing product, cannot update
 		if original_upc != upc:
-			if self.product_dao.search_product(upc):
-				raise IllegalOperationException("Cannot update: A product with the new UPC already exists.")
-			self.product_dao.delete_product(original_upc)
-			product.upc = upc
-			self.product_dao.create_product(product)
-		else:
-			self.product_dao.update_product(original_upc, product)
-		return True
+			if self.search_product(upc):
+				raise IllegalOperationException("Illegal Operation: Cannot update a product with a new UPC that is already registered.")
+
+		product = Product(upc, description, price)
+		return self.product_dao.update_product(original_upc, product)
 			
 	def delete_product(self, upc):
 		"""
@@ -279,18 +272,17 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException("User must be logged in to delete products.")
+			raise IllegalAccessException("Illegal Access: Must login first.")
 
 		# first, search the product by key
-		product = self.product_dao.search_product(upc)
+		product = self.search_product(upc)
 
 		# product does not exist, cannot delete
 		if not product:
-			raise IllegalOperationException()
+			raise IllegalOperationException("Illegal Operation: Cannot delete an inexistent product.")
 
 		# product exists, delete product
-		self.product_dao.delete_product(upc)
-		return True
+		return self.product_dao.delete_product(upc)
 	
 	def list_products(self):
 		"""
@@ -304,14 +296,9 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException("User must be logged in to list products.")
+			raise IllegalAccessException("Illegal Access: Must login first.")
 
 		return self.product_dao.list_products()
-	
-		#products_list = []
-		#for product in self.products.values():
-		#	products_list.append(product)
-		#return products_list
 
 	def add_sale(self, sale):
 		"""
@@ -330,6 +317,7 @@ class Controller():
 		self.sales_counter += 1
 		self.sale_dao.create_sale(sale)
 
+
 	def search_sale(self, id):
 		"""
 		Search for a sale by ID.
@@ -347,7 +335,7 @@ class Controller():
   
   		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException()
+			raise IllegalAccessException("Illegal Access: Must login first.")
 
 		return self.sale_dao.search_sale(id)
 
@@ -363,14 +351,9 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException()
+			raise IllegalAccessException("Illegal Access: Must login first.")
 
 		return self.sale_dao.list_sales()
-
-		#sales_list = []
-		#for sale in self.sales.values():
-		#	sales_list.append(sale)
-		#return sales_list
 
 	def initiate_sale(self):
 		"""
@@ -384,11 +367,11 @@ class Controller():
   
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException()
+			raise IllegalAccessException("Illegal Access: Must login first.")
 		
 		# there is a current sale is current sale, cannot update
 		if self.current_sale:
-			raise IllegalOperationException()
+			raise IllegalOperationException("cannot initiate sale with a sale in progress")
 		
 		# create a sale with default values (null and zero) and make it the current sale
 		sale  = Sale()
@@ -407,11 +390,11 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException()
+			raise IllegalAccessException("Illegal Access: Must login first.")
 		
 		# there is no current sale to be cancelled, cannot cancel
 		if not self.current_sale:
-			raise NoCurrentSaleException()
+			raise NoCurrentSaleException("cannot cancel sale without initiating it first")
 		
 		# cancel an existing initiated sale
 		self.current_sale = None
@@ -436,16 +419,16 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException()
+			raise IllegalAccessException("Illegal Access: Must login first.")
 		
 		# there is no current sale to add sale line item, cannot add
 		if not self.current_sale:
-			raise NoCurrentSaleException()
+			raise NoCurrentSaleException("cannot add sale new line item without a valid current sale")
 		
 		# check whether the product is valid before adding the sale line item
 		product = self.search_product(upc)
 		if not product:
-			raise InvalidProductException()
+			raise InvalidProductException("Invalid Product: Must be a valid UPC registered in the system.")
 		
 		# query the product price first 
 		price = product.price
@@ -466,15 +449,15 @@ class Controller():
  
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException()
+			raise IllegalAccessException("Illegal Access: Must login first.")
 		
-		# there is no current sale to be cancelled, cannot cancel
+		# there is no current sale to be finished, cannot finish
 		if not self.current_sale:
-			raise NoCurrentSaleException()
+			raise NoCurrentSaleException("cannot finish sale without initiating it first")
 		
 		# cannot finish current sale with no sale line items
 		if self.current_sale.get_number_sale_line_items() == 0:
-			raise IllegalOperationException()
+			raise IllegalOperationException("cannot finish a sale without items")
 
 		# set the relevant fields in the current sale
 		self.sales_counter += 1
@@ -484,12 +467,13 @@ class Controller():
 		self.current_sale.gst = round(0.05 * self.current_sale.total, 2)
 		self.current_sale.pst = round(0.07 * self.current_sale.total, 2) 
 		self.current_sale.customer_total = round(self.current_sale.total + self.current_sale.gst + self.current_sale.pst, 2)
+		# store the sale receipt
+		self.current_sale.set_sale_receipt(self.print_sale_receipt())
 
 		# add the current sale to the sales collection
-		self.sale_dao.create_sale(self.current_sale)	
+		self.sale_dao.create_sale(self.current_sale)
 		
-		# print the sale receipt, finish current sale and return the sale with success
-		self.current_sale.set_sale_receipt(self.print_sale_receipt())
+		# finish current sale and return the sale with success
 		temp = self.current_sale
 		self.current_sale = None
 		return temp
@@ -507,11 +491,11 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException()
+			raise IllegalAccessException("Illegal Access: Must login first.")
 		
 		# there is no current sale to be printed, cannot print
 		if not self.current_sale:
-			raise NoCurrentSaleException()
+			raise NoCurrentSaleException("cannot print sale receipt without a valid current sale")
 		
 		# cannot print current sale with no sale line items
 		if self.current_sale.get_number_sale_line_items() == 0:
@@ -545,7 +529,7 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException()
+			raise IllegalAccessException("Illegal Access: Must login first.")
 
 		# return current sale
 		return self.current_sale
@@ -562,11 +546,11 @@ class Controller():
  
  		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException()
+			raise IllegalAccessException("Illegal Access: Must login first.")
 
 		# there must be a valid current sale
 		if not self.current_sale:
-			raise NoCurrentSaleException()
+			raise NoCurrentSaleException("cannot print sale line items without a valid current sale")
 
 		# create the string with the list of sale line items
 		print_string = ""
@@ -595,11 +579,11 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException()
+			raise IllegalAccessException("Illegal Access: Must login first.")
 
 		# there must be a valid current sale
 		if not self.current_sale:
-			raise NoCurrentSaleException()
+			raise NoCurrentSaleException("cannot search sale line item without a valid current sale")
 
 		# search a new sale line item with the given code and return it 
 		return self.current_sale.search_sale_line_item(code)
@@ -625,11 +609,11 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException()
+			raise IllegalAccessException("Illegal Access: Must login first.")
 
 		# there must be a valid current sale
 		if not self.current_sale:
-			raise NoCurrentSaleException()
+			raise NoCurrentSaleException("cannot create sale line items without a valid current sale")
 
 		# create a new sale line item and return it
 		return self.current_sale.create_sale_line_item(quantity, price, upc)
@@ -651,11 +635,11 @@ class Controller():
 
 		# must be logged in to do operation
 		if not self.logged:
-			raise IllegalAccessException()
+			raise IllegalAccessException("Illegal Access: Must login first.")
 
 		# there must be a valid current sale
 		if not self.current_sale:
-			raise NoCurrentSaleException()
+			raise NoCurrentSaleException("cannot print sale line item without a valid current sale")
 
 		# search the sale line item
 		sale_line_item = self.search_sale_line_item(code)
@@ -679,5 +663,3 @@ class Controller():
 		"""
 
 		return self.sales_counter
-	
-

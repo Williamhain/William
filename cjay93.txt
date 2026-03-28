@@ -1,4 +1,0 @@
-Netlink ID: cjay93
-Name: Chris Jackson
-Student Number: V00749721
-Email: cjay93@uvic.ca
