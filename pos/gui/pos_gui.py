@@ -21,6 +21,7 @@ class PosGUI(QMainWindow):
         self.stack_layout = QStackedLayout()
         self.setup_login_page()
         self.setup_main_page()
+        self.setup_create_product_page()
         
 
         container = QWidget()
@@ -58,9 +59,14 @@ class PosGUI(QMainWindow):
         self.main_message_label = QLabel("Logged in")
         self.logout_button = QPushButton("Log out")
         self.logout_button.clicked.connect(self.logout)
+        self.create_product_page_button = QPushButton("Create Product")
+        self.create_product_page_button.clicked.connect(self.switch_to_create_product_page)
         layout = QVBoxLayout()
         layout.addWidget(self.main_message_label)
         layout.addWidget(self.logout_button)
+        layout.addWidget(self.create_product_page_button)
+
+
 
         self.main_page.setLayout(layout)
         self.stack_layout.addWidget(self.main_page)
@@ -86,6 +92,63 @@ class PosGUI(QMainWindow):
         self.controller.logout()
         self.login_message_label.setText("POS System\n\nPlease enter your log in details")
         self.stack_layout.setCurrentIndex(0)
+
+    # sets up the product page, adding all necessary labels, inputs, layout, and the functionality to create a new product and add
+    # its description, price and UPC code. 
+    def setup_create_product_page(self):
+        self.create_product_page = QWidget()
+
+        self.create_product_details_label = QLabel("Please enter new product details")
+
+        self.upc_input = QLineEdit()
+        self.upc_input.setPlaceholderText("UPC")
+        self.description_input = QLineEdit()
+        self.description_input.setPlaceholderText("Description")
+        self.price_input = QLineEdit()
+        self.price_input.setPlaceholderText("Price")
+
+        self.create_product_button = QPushButton("Create Product")
+        self.create_product_button.clicked.connect(self.create_product)
+        self.back_button = QPushButton("Back")
+        self.back_button.clicked.connect(self.switch_to_main_page)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.create_product_details_label)
+        layout.addWidget(self.upc_input)
+        layout.addWidget(self.description_input)
+        layout.addWidget(self.price_input)
+        layout.addWidget(self.create_product_button)
+        layout.addWidget(self.back_button)
+
+        self.create_product_page.setLayout(layout)
+        self.stack_layout.addWidget(self.create_product_page)
+
+    # switches to the main page
+    def switch_to_main_page(self):
+        self.stack_layout.setCurrentIndex(1)
+
+    # switches to the create a product page
+    def switch_to_create_product_page(self):
+        self.create_product_details_label.setText("Please enter new product details")
+        self.stack_layout.setCurrentIndex(2)
+    
+    # creates a product using its UPC, description and price. If the price is not a number, throw an exception.
+    def create_product(self):
+        upc = self.upc_input.text()
+        description = self.description_input.text()
+
+        try:
+            price = float(self.price_input.text())
+        except ValueError:
+            self.create_product_details_label.setText("Please input a number for the price")
+            return
+        
+        self.controller.create_product(upc, description, price)
+        self.create_product_details_label.setText("Product successfully created")
+        self.upc_input.clear()
+        self.description_input.clear()
+        self.price_input.clear()
+
 
 
 def main():
