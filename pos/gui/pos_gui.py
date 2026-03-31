@@ -1,10 +1,34 @@
 import sys
 from pos.configuration import Configuration
+from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QLineEdit, QPushButton, QWidget, QStackedLayout, QVBoxLayout
 from pos.controller import Controller
 from pos.exception.invalid_logout_exception import InvalidLogoutException
 from pos.exception.invalid_login_exception import InvalidLoginException
+
+# creates a table that stores and displays the product data
+class ProductTable(QtCore.QAbstractTableModel):
+    def __init__(self, data):
+        super().__init__()
+        self._data = data
+
+    def data(self, index, role):
+        if role == Qt.ItemDataRole.DisplayRole:
+            return self._data[index.row()][index.column()]
+
+    def rowCount(self, index):
+        return len(self._data)
+    def columnCount(self, index):
+        if len(self._data) == 0:
+            return 0
+        return len(self._data[0])
+
+    def headerData(self, section, orientation, role):
+        if role == Qt.ItemDataRole.DisplayRole:
+            if orientation == Qt.Orientation.Horizontal:
+                headers = ["UPC", "Description", "Price"]
+                return headers[section]
 
 class PosGUI(QMainWindow):
 
@@ -22,6 +46,7 @@ class PosGUI(QMainWindow):
         self.setup_login_page()
         self.setup_main_page()
         self.setup_create_product_page()
+        self.setup_list_products_page()
         
 
         container = QWidget()
@@ -61,12 +86,13 @@ class PosGUI(QMainWindow):
         self.logout_button.clicked.connect(self.logout)
         self.create_product_page_button = QPushButton("Create Product")
         self.create_product_page_button.clicked.connect(self.switch_to_create_product_page)
+        self.list_products_page_button = QPushButton("List All Products")
+        self.list_products_page_button.clicked.connect(self.switch_to_list_products_page)
         layout = QVBoxLayout()
         layout.addWidget(self.main_message_label)
         layout.addWidget(self.logout_button)
         layout.addWidget(self.create_product_page_button)
-
-
+        layout.addWidget(self.list_products_page_button)
 
         self.main_page.setLayout(layout)
         self.stack_layout.addWidget(self.main_page)
@@ -123,6 +149,24 @@ class PosGUI(QMainWindow):
         self.create_product_page.setLayout(layout)
         self.stack_layout.addWidget(self.create_product_page)
 
+    # sets up the product listing page adding all necessary labels, inputs, layout, and the functionality to list all products
+    # and be able to return to the previous page. 
+    def setup_list_products_page(self):
+        self.list_products_page = QWidget()
+
+        self.list_products_label = QLabel("All Products")
+        self.product_table = QtWidgets.QTableView()
+        self.back_button_list_products = QPushButton("Back")
+        self.back_button_list_products.clicked.connect(self.switch_to_main_page)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.list_products_label)
+        layout.addWidget(self.product_table)
+        layout.addWidget(self.back_button_list_products)
+
+        self.list_products_page.setLayout(layout)
+        self.stack_layout.addWidget(self.list_products_page)
+
     # switches to the main page
     def switch_to_main_page(self):
         self.stack_layout.setCurrentIndex(1)
@@ -131,6 +175,18 @@ class PosGUI(QMainWindow):
     def switch_to_create_product_page(self):
         self.create_product_details_label.setText("Please enter new product details")
         self.stack_layout.setCurrentIndex(2)
+
+    # switches to the product listing page
+    def switch_to_list_products_page(self):
+        products = self.controller.list_products()
+
+        list_data = []
+        for product in products:
+            list_data.append([product.upc, product.description, product.price])
+
+        self.product_model = ProductTable(list_data)
+        self.product_table.setModel(self.product_model)
+        self.stack_layout.setCurrentIndex(3)
     
     # creates a product using its UPC, description and price. If the price is not a number, throw an exception.
     def create_product(self):
