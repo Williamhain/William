@@ -27,7 +27,7 @@ class ProductTable(QtCore.QAbstractTableModel):
     def headerData(self, section, orientation, role):
         if role == Qt.ItemDataRole.DisplayRole:
             if orientation == Qt.Orientation.Horizontal:
-                headers = ["UPC", "Description", "Price"]
+                headers = ["UPC", "Product Name", "Price"]
                 return headers[section]
 
 class PosGUI(QMainWindow):
@@ -47,6 +47,7 @@ class PosGUI(QMainWindow):
         self.setup_main_page()
         self.setup_create_product_page()
         self.setup_list_products_page()
+        self.setup_retrieve_products_page()
         
 
         container = QWidget()
@@ -88,11 +89,14 @@ class PosGUI(QMainWindow):
         self.create_product_page_button.clicked.connect(self.switch_to_create_product_page)
         self.list_products_page_button = QPushButton("List All Products")
         self.list_products_page_button.clicked.connect(self.switch_to_list_products_page)
+        self.retrieve_products_page_button = QPushButton("Retrieve Products")
+        self.retrieve_products_page_button.clicked.connect(self.switch_to_retrieve_products_page)
         layout = QVBoxLayout()
         layout.addWidget(self.main_message_label)
         layout.addWidget(self.logout_button)
         layout.addWidget(self.create_product_page_button)
         layout.addWidget(self.list_products_page_button)
+        layout.addWidget(self.retrieve_products_page_button)
 
         self.main_page.setLayout(layout)
         self.stack_layout.addWidget(self.main_page)
@@ -129,7 +133,7 @@ class PosGUI(QMainWindow):
         self.upc_input = QLineEdit()
         self.upc_input.setPlaceholderText("UPC")
         self.description_input = QLineEdit()
-        self.description_input.setPlaceholderText("Description")
+        self.description_input.setPlaceholderText("Product Name")
         self.price_input = QLineEdit()
         self.price_input.setPlaceholderText("Price")
 
@@ -187,6 +191,12 @@ class PosGUI(QMainWindow):
         self.product_model = ProductTable(list_data)
         self.product_table.setModel(self.product_model)
         self.stack_layout.setCurrentIndex(3)
+
+    # switches to the retrieve products page
+    def switch_to_retrieve_products_page(self):
+        self.retrieve_products_input.clear()
+        self.retrieve_product_description.setText("Please enter a product name to search for a specific product")
+        self.stack_layout.setCurrentIndex(4)
     
     # creates a product using its UPC, description and price. If the price is not a number, throw an exception.
     def create_product(self):
@@ -204,6 +214,42 @@ class PosGUI(QMainWindow):
         self.upc_input.clear()
         self.description_input.clear()
         self.price_input.clear()
+
+    # sets up the retrieve products page, adding all necessary labels, inputs, layout, and the functionality to search for a specific product and press a button to
+    # retrieve all matching products as well as go back to the main page
+    def setup_retrieve_products_page(self):
+        self.retrieve_products_page = QWidget()
+
+        self.retrieve_product_description = QLabel("Please enter a product name to search for a specific product")
+        self.retrieve_products_input = QLineEdit()
+        self.retrieve_products_input.setPlaceholderText("Product Name")
+        self.retrieve_products_button = QPushButton("Retrieve all products")
+        self.retrieve_products_button.clicked.connect(self.retrieve_products)
+        self.retrieve_products_table = QtWidgets.QTableView()
+        self.back_button_retrieve_products = QPushButton("Back")
+        self.back_button_retrieve_products.clicked.connect(self.switch_to_main_page)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.retrieve_product_description)
+        layout.addWidget(self.retrieve_products_input)
+        layout.addWidget(self.retrieve_products_button)
+        layout.addWidget(self.retrieve_products_table)
+        layout.addWidget(self.back_button_retrieve_products)
+
+        self.retrieve_products_page.setLayout(layout)
+        self.stack_layout.addWidget(self.retrieve_products_page)
+
+    # searches for a specific product and if found appends it to the retrieve products list and then presents it as a table
+    def retrieve_products(self):
+        search = self.retrieve_products_input.text()
+        products = self.controller.retrieve_products(search)
+        retrieve_data = []
+        for product in products:
+            retrieve_data.append([product.upc, product.description, product.price])
+
+        self.retrieve_product_model = ProductTable(retrieve_data)
+        self.retrieve_products_table.setModel(self.retrieve_product_model)
+
 
 
 
