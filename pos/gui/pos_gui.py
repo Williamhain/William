@@ -48,6 +48,7 @@ class PosGUI(QMainWindow):
         self.setup_create_product_page()
         self.setup_list_products_page()
         self.setup_retrieve_products_page()
+        self.setup_search_product_page()
         
 
         container = QWidget()
@@ -91,12 +92,15 @@ class PosGUI(QMainWindow):
         self.list_products_page_button.clicked.connect(self.switch_to_list_products_page)
         self.retrieve_products_page_button = QPushButton("Retrieve Products")
         self.retrieve_products_page_button.clicked.connect(self.switch_to_retrieve_products_page)
+        self.search_product_page_button = QPushButton("Search Product by UPC")
+        self.search_product_page_button.clicked.connect(self.switch_to_search_product_page)
         layout = QVBoxLayout()
         layout.addWidget(self.main_message_label)
         layout.addWidget(self.logout_button)
         layout.addWidget(self.create_product_page_button)
         layout.addWidget(self.list_products_page_button)
         layout.addWidget(self.retrieve_products_page_button)
+        layout.addWidget(self.search_product_page_button)
 
         self.main_page.setLayout(layout)
         self.stack_layout.addWidget(self.main_page)
@@ -197,6 +201,12 @@ class PosGUI(QMainWindow):
         self.retrieve_products_input.clear()
         self.retrieve_product_description.setText("Please enter a product name to search for a specific product")
         self.stack_layout.setCurrentIndex(4)
+
+    # switches to the search product page
+    def switch_to_search_product_page(self):
+        self.search_product_input.clear()
+        self.search_product_description.setText("Please enter a UPC code to search for a specific product")
+        self.stack_layout.setCurrentIndex(5)
     
     # creates a product using its UPC, description and price. If the price is not a number, throw an exception.
     def create_product(self):
@@ -250,7 +260,43 @@ class PosGUI(QMainWindow):
         self.retrieve_product_model = ProductTable(retrieve_data)
         self.retrieve_products_table.setModel(self.retrieve_product_model)
 
+    # sets up the search product page, adding all necessary labels, inputs, layout, and the functionality to search for a product by its corresponding UPC code
+    # and press a button to return to the main page
+    def setup_search_product_page(self):
+        self.search_product_page = QWidget()
 
+        self.search_product_description = QLabel("Please enter a UPC code to search for a specific product")
+        self.search_product_input = QLineEdit()
+        self.search_product_input.setPlaceholderText("UPC")
+        self.search_product_button = QPushButton("Search for Product")
+        self.search_product_button.clicked.connect(self.search_product)
+
+        self.search_product_table = QtWidgets.QTableView()
+
+        self.back_button_search_product = QPushButton("Back")
+        self.back_button_search_product.clicked.connect(self.switch_to_main_page)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.search_product_description)
+        layout.addWidget(self.search_product_input)
+        layout.addWidget(self.search_product_button)
+        layout.addWidget(self.search_product_table)
+        layout.addWidget(self.back_button_search_product)
+
+        self.search_product_page.setLayout(layout)
+        self.stack_layout.addWidget(self.search_product_page)
+
+    # searches for a specific product via its UPC code and if found appends it to the search data list and then presents it as a table
+    def search_product(self):
+        upc = self.search_product_input.text()
+        product = self.controller.search_product(upc)
+
+        search_data = []
+        if product is not None:
+            search_data.append([product.upc, product.description, product.price])
+
+        self.search_product_model = ProductTable(search_data)
+        self.search_product_table.setModel(self.search_product_model)
 
 
 def main():
