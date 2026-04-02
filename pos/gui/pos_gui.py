@@ -51,6 +51,7 @@ class PosGUI(QMainWindow):
         self.setup_retrieve_products_page()
         self.setup_search_product_page()
         self.setup_update_product_page()
+        self.setup_delete_product_page()
         
 
         container = QWidget()
@@ -100,6 +101,8 @@ class PosGUI(QMainWindow):
         self.search_product_page_button.clicked.connect(self.switch_to_search_product_page)
         self.update_product_page_button = QPushButton("Update Product Information")
         self.update_product_page_button.clicked.connect(self.switch_to_update_product_page)
+        self.delete_product_page_button = QPushButton("Delete Product")
+        self.delete_product_page_button.clicked.connect(self.switch_to_delete_product_page)
         layout = QVBoxLayout()
         layout.addWidget(self.main_message_label)
         layout.addWidget(self.logout_button)
@@ -108,6 +111,7 @@ class PosGUI(QMainWindow):
         layout.addWidget(self.retrieve_products_page_button)
         layout.addWidget(self.search_product_page_button)
         layout.addWidget(self.update_product_page_button)
+        layout.addWidget(self.delete_product_page_button)
 
         self.main_page.setLayout(layout)
         self.stack_layout.addWidget(self.main_page)
@@ -223,6 +227,12 @@ class PosGUI(QMainWindow):
         self.updated_price_input.clear()
         self.update_product_description.setText("Please enter the original UPC code of the product to be updated and enter the desired changes")
         self.stack_layout.setCurrentIndex(6)
+
+    # switches to the delete product page
+    def switch_to_delete_product_page(self):
+        self.delete_product_input.clear()
+        self.delete_product_description.setText("Please enter the UPC code of the product you wish to remove")
+        self.stack_layout.setCurrentIndex(7)
     
     # creates a product using its UPC, description and price. If the price is not a number, throw an exception.
     def create_product(self):
@@ -367,7 +377,7 @@ class PosGUI(QMainWindow):
 
         if updated_upc == "":
             updated_upc = product.upc
-            
+
         if updated_description == "":
             updated_description = product.description
 
@@ -400,6 +410,41 @@ class PosGUI(QMainWindow):
             self.updated_price_input.clear()
         except IllegalOperationException:
             self.update_product_description.setText("Product does not exist")
+
+    # sets up the delete product page, adding all necessary labels, inputs, layout, and the functionality to delete a product via its UPC
+    # code and a button to be able to return to the main page
+    def setup_delete_product_page(self):
+        self.delete_product_page = QWidget()
+
+        self.delete_product_description = QLabel("Please enter the UPC code of the product you wish to remove")
+        self.delete_product_input = QLineEdit()
+        self.delete_product_input.setPlaceholderText("UPC")
+        self.delete_product_button = QPushButton("Remove Product")
+        self.delete_product_button.clicked.connect(self.delete_product)
+        self.back_button_delete_product = QPushButton("Back")
+        self.back_button_delete_product.clicked.connect(self.switch_to_main_page)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.delete_product_description)
+        layout.addWidget(self.delete_product_input)
+        layout.addWidget(self.delete_product_button)
+        layout.addWidget(self.back_button_delete_product)
+
+        self.delete_product_page.setLayout(layout)
+        self.stack_layout.addWidget(self.delete_product_page)
+
+    # deletes a product via its UPC code and throw an exception if the product does not exist
+    def delete_product(self):
+        upc = self.delete_product_input.text()
+
+        try:
+            self.controller.delete_product(upc)
+            self.delete_product_description.setText("Product removed successfully")
+            self.delete_product_input.clear()
+
+        except IllegalOperationException:
+            self.delete_product_description.setText("Specified product does not exist")
+
 
 def main():
     app = QApplication(sys.argv)
