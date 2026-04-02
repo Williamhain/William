@@ -7,6 +7,7 @@ from pos.controller import Controller
 from pos.exception.invalid_logout_exception import InvalidLogoutException
 from pos.exception.invalid_login_exception import InvalidLoginException
 from pos.exception.illegal_operation_exception import IllegalOperationException
+from pos.exception.illegal_access_exception import IllegalAccessException
 
 # creates a table that stores and displays the product data
 class ProductTable(QtCore.QAbstractTableModel):
@@ -52,7 +53,7 @@ class PosGUI(QMainWindow):
         self.setup_search_product_page()
         self.setup_update_product_page()
         self.setup_delete_product_page()
-        
+        self.setup_sale_menu_page()
 
         container = QWidget()
         container.setLayout(self.stack_layout)
@@ -103,6 +104,8 @@ class PosGUI(QMainWindow):
         self.update_product_page_button.clicked.connect(self.switch_to_update_product_page)
         self.delete_product_page_button = QPushButton("Delete Product")
         self.delete_product_page_button.clicked.connect(self.switch_to_delete_product_page)
+        self.sale_menu_page_button = QPushButton("Manage Sales")
+        self.sale_menu_page_button.clicked.connect(self.switch_to_sale_menu_page)
         layout = QVBoxLayout()
         layout.addWidget(self.main_message_label)
         layout.addWidget(self.logout_button)
@@ -112,6 +115,7 @@ class PosGUI(QMainWindow):
         layout.addWidget(self.search_product_page_button)
         layout.addWidget(self.update_product_page_button)
         layout.addWidget(self.delete_product_page_button)
+        layout.addWidget(self.sale_menu_page_button)
 
         self.main_page.setLayout(layout)
         self.stack_layout.addWidget(self.main_page)
@@ -234,6 +238,12 @@ class PosGUI(QMainWindow):
         self.delete_product_description.setText("Please enter the UPC code of the product you wish to remove")
         self.stack_layout.setCurrentIndex(7)
     
+    # swtiches to the sale menu page
+    def switch_to_sale_menu_page(self):
+        self.sale_status_label.setText("No active sale.")
+        self.initiate_sale_button.setEnabled(True)
+        self.stack_layout.setCurrentWidget(self.sale_menu_page)
+
     # creates a product using its UPC, description and price. If the price is not a number, throw an exception.
     def create_product(self):
         upc = self.upc_input.text()
@@ -409,7 +419,7 @@ class PosGUI(QMainWindow):
             self.updated_description_input.clear()
             self.updated_price_input.clear()
         except IllegalOperationException:
-            self.update_product_description.setText("Product does not exist")
+            self.update_product_description.setText("This upc is already in use by product")
 
     # sets up the delete product page, adding all necessary labels, inputs, layout, and the functionality to delete a product via its UPC
     # code and a button to be able to return to the main page
@@ -433,6 +443,29 @@ class PosGUI(QMainWindow):
         self.delete_product_page.setLayout(layout)
         self.stack_layout.addWidget(self.delete_product_page)
 
+
+
+
+    def setup_sale_menu_page(self):
+        self.sale_menu_page = QWidget()
+        sale_layout = QVBoxLayout()
+        
+        self.sale_status_label = QLabel("No active sale.")
+
+        self.initiate_sale_button = QPushButton("Initiate New Sale")
+        self.initiate_sale_button.clicked.connect(self.initiate_sale)
+        
+        # Add a back button so you can return to the main menu
+        self.back_button_sale_menu = QPushButton("Back")
+        self.back_button_sale_menu.clicked.connect(self.switch_to_main_page)
+
+        sale_layout.addWidget(self.sale_status_label)
+        sale_layout.addWidget(self.initiate_sale_button)
+        sale_layout.addWidget(self.back_button_sale_menu)
+        
+        self.sale_menu_page.setLayout(sale_layout)
+        self.stack_layout.addWidget(self.sale_menu_page)
+
     # deletes a product via its UPC code and throw an exception if the product does not exist
     def delete_product(self):
         upc = self.delete_product_input.text()
@@ -445,6 +478,20 @@ class PosGUI(QMainWindow):
         except IllegalOperationException:
             self.delete_product_description.setText("Specified product does not exist")
 
+    # Initiates a new sale and handles exceptions
+    def initiate_sale(self):
+        try:
+            self.controller.initiate_sale()
+            self.sale_status_label.setText("Active Sale: IN PROGRESS")
+            QtWidgets.QMessageBox.information(self, "Success", "New sale initiated successfully!")
+            
+            # Disable the button so they don't click it twice by accident
+            self.initiate_sale_button.setEnabled(False) 
+            
+        except IllegalAccessException:
+            QtWidgets.QMessageBox.warning(self, "Access Denied", "You must be logged in to initiate a sale.")
+        except IllegalOperationException:
+            QtWidgets.QMessageBox.warning(self, "Error", "A sale is already in progress. Please finish or cancel it first.")
 
 def main():
     app = QApplication(sys.argv)
