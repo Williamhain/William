@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QLineEdit, QPushB
 from pos.controller import Controller
 from pos.exception.invalid_logout_exception import InvalidLogoutException
 from pos.exception.invalid_login_exception import InvalidLoginException
+from pos.exception.illegal_operation_exception import IllegalOperationException
 
 # creates a table that stores and displays the product data
 class ProductTable(QtCore.QAbstractTableModel):
@@ -49,6 +50,7 @@ class PosGUI(QMainWindow):
         self.setup_list_products_page()
         self.setup_retrieve_products_page()
         self.setup_search_product_page()
+        self.setup_update_product_page()
         
 
         container = QWidget()
@@ -69,6 +71,8 @@ class PosGUI(QMainWindow):
 
         self.login_button = QPushButton("Log in")
         self.login_button.clicked.connect(self.login)
+        self.login_button.setDefault(True)
+        self.login_button.setAutoDefault(True)
 
         layout = QVBoxLayout()
         layout.addWidget(self.login_message_label)
@@ -94,6 +98,8 @@ class PosGUI(QMainWindow):
         self.retrieve_products_page_button.clicked.connect(self.switch_to_retrieve_products_page)
         self.search_product_page_button = QPushButton("Search Product by UPC")
         self.search_product_page_button.clicked.connect(self.switch_to_search_product_page)
+        self.update_product_page_button = QPushButton("Update Product Information")
+        self.update_product_page_button.clicked.connect(self.switch_to_update_product_page)
         layout = QVBoxLayout()
         layout.addWidget(self.main_message_label)
         layout.addWidget(self.logout_button)
@@ -101,6 +107,7 @@ class PosGUI(QMainWindow):
         layout.addWidget(self.list_products_page_button)
         layout.addWidget(self.retrieve_products_page_button)
         layout.addWidget(self.search_product_page_button)
+        layout.addWidget(self.update_product_page_button)
 
         self.main_page.setLayout(layout)
         self.stack_layout.addWidget(self.main_page)
@@ -207,6 +214,15 @@ class PosGUI(QMainWindow):
         self.search_product_input.clear()
         self.search_product_description.setText("Please enter a UPC code to search for a specific product")
         self.stack_layout.setCurrentIndex(5)
+
+    # switches to the update product page
+    def switch_to_update_product_page(self):
+        self.original_upc_input.clear()
+        self.updated_upc_input.clear()
+        self.updated_description_input.clear()
+        self.updated_price_input.clear()
+        self.update_product_description.setText("Please enter the original UPC code of the product to be updated and enter the desired changes")
+        self.stack_layout.setCurrentIndex(6)
     
     # creates a product using its UPC, description and price. If the price is not a number, throw an exception.
     def create_product(self):
@@ -298,6 +314,92 @@ class PosGUI(QMainWindow):
         self.search_product_model = ProductTable(search_data)
         self.search_product_table.setModel(self.search_product_model)
 
+    # sets up the update product page, adding all necessary labels, inputs, layout, and the functionality to update a product's name
+    # price, and/or UPC code and a back button to be able to return to the main page
+    def setup_update_product_page(self):
+        self.update_product_page = QWidget()
+
+        self.update_product_description = QLabel("Please enter the original UPC code of the product to be updated and enter the desired changes")
+        self.original_upc_input = QLineEdit()
+        self.original_upc_input.setPlaceholderText("Original UPC Code")
+        self.updated_upc_input = QLineEdit()
+        self.updated_upc_input.setPlaceholderText("New UPC Code")
+        self.updated_description_input = QLineEdit()
+        self.updated_description_input.setPlaceholderText("New Name")
+        self.updated_price_input = QLineEdit()
+        self.updated_price_input.setPlaceholderText("New Price")
+        self.update_product_button = QPushButton("Update Product")
+        self.update_product_button.clicked.connect(self.update_product)
+        self.back_button_update_product = QPushButton("Back")
+        self.back_button_update_product.clicked.connect(self.switch_to_main_page)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.update_product_description)
+        layout.addWidget(self.original_upc_input)
+        layout.addWidget(self.updated_upc_input)
+        layout.addWidget(self.updated_description_input)
+        layout.addWidget(self.updated_price_input)
+        layout.addWidget(self.update_product_button)
+        layout.addWidget(self.back_button_update_product)
+
+        self.update_product_page.setLayout(layout)
+        self.stack_layout.addWidget(self.update_product_page)
+
+    # updates a product by allowing user to input the original UPC code of the product that they wish to update
+    # and then modifying either the UPC code, price, or product name as desired. Does not allow negative numbers for prices
+    # and only allows up to 2 decimal places. 
+    def update_product(self):
+        original_upc = self.original_upc_input.text()
+
+        try:
+            product = self.controller.search_product(original_upc)
+        except IllegalOperationException:
+            self.update_product_description.setText("Product does not exist")
+            return
+
+        if product is None:
+            self.update_product_description.setText("Product does not exist")
+            return
+
+        updated_upc = self.updated_upc_input.text()
+        updated_description = self.updated_description_input.text()
+        updated_price_text = self.updated_price_input.text()
+
+        if updated_upc == "":
+            updated_upc = product.upc
+            
+        if updated_description == "":
+            updated_description = product.description
+
+        if updated_price_text == "":
+            updated_price = product.price
+        else:
+            try:
+                updated_price = float(updated_price_text)
+
+                if updated_price < 0:
+                    self.update_product_description.setText("Price cannot be negative")
+                    return
+
+                if "." in updated_price_text:
+                    decimal_part = updated_price_text.split(".")[1]
+                    if len(decimal_part) > 2:
+                        self.update_product_description.setText("Price can have at most 2 decimal places")
+                        return
+
+            except ValueError:
+                self.update_product_description.setText("Please input a valid number for the price")
+                return
+
+        try:
+            self.controller.update_product(original_upc, updated_upc, updated_description, updated_price)
+            self.update_product_description.setText("Product successfully updated")
+            self.original_upc_input.clear()
+            self.updated_upc_input.clear()
+            self.updated_description_input.clear()
+            self.updated_price_input.clear()
+        except IllegalOperationException:
+            self.update_product_description.setText("Product does not exist")
 
 def main():
     app = QApplication(sys.argv)
