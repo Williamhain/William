@@ -8,7 +8,7 @@ from pos.exception.invalid_logout_exception import InvalidLogoutException
 from pos.exception.invalid_login_exception import InvalidLoginException
 from pos.exception.illegal_operation_exception import IllegalOperationException
 from pos.exception.illegal_access_exception import IllegalAccessException
-
+from pos.exception.no_current_sale_exception import NoCurrentSaleException
 # creates a table that stores and displays the product data
 class ProductTable(QtCore.QAbstractTableModel):
     def __init__(self, data):
@@ -443,9 +443,8 @@ class PosGUI(QMainWindow):
         self.delete_product_page.setLayout(layout)
         self.stack_layout.addWidget(self.delete_product_page)
 
-
-
-
+    # sets up the sale menu page, including labels for sale status, 
+    # buttons to initiate a new sale, and navigation to return to the main menu.
     def setup_sale_menu_page(self):
         self.sale_menu_page = QWidget()
         sale_layout = QVBoxLayout()
@@ -455,12 +454,17 @@ class PosGUI(QMainWindow):
         self.initiate_sale_button = QPushButton("Initiate New Sale")
         self.initiate_sale_button.clicked.connect(self.initiate_sale)
         
+        # button to cancel the current active sale
+        self.cancel_sale_button = QPushButton("Cancel Current Sale")
+        self.cancel_sale_button.clicked.connect(self.cancel_sale)
+
         # Add a back button so you can return to the main menu
         self.back_button_sale_menu = QPushButton("Back")
         self.back_button_sale_menu.clicked.connect(self.switch_to_main_page)
 
         sale_layout.addWidget(self.sale_status_label)
         sale_layout.addWidget(self.initiate_sale_button)
+        sale_layout.addWidget(self.cancel_sale_button)
         sale_layout.addWidget(self.back_button_sale_menu)
         
         self.sale_menu_page.setLayout(sale_layout)
@@ -493,6 +497,21 @@ class PosGUI(QMainWindow):
         except IllegalOperationException:
             QtWidgets.QMessageBox.warning(self, "Error", "A sale is already in progress. Please finish or cancel it first.")
 
+    # cancels the active sale and resets the UI status
+    def cancel_sale(self):
+        try:
+            self.controller.cancel_current_sale()
+            self.sale_status_label.setText("No active sale.")
+            
+            # Re-enable the initiate button so a new sale can be started
+            self.initiate_sale_button.setEnabled(True)
+            QtWidgets.QMessageBox.information(self, "Success", "The current sale has been cancelled.")
+            
+        except IllegalAccessException:
+            QtWidgets.QMessageBox.warning(self, "Access Denied", "You must be logged in to cancel a sale.")
+        except NoCurrentSaleException:
+            QtWidgets.QMessageBox.warning(self, "Error", "There is no active sale to cancel.")
+            
 def main():
     app = QApplication(sys.argv)
     window = PosGUI()
