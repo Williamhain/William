@@ -9,6 +9,8 @@ from pos.exception.invalid_login_exception import InvalidLoginException
 from pos.exception.illegal_operation_exception import IllegalOperationException
 from pos.exception.illegal_access_exception import IllegalAccessException
 from pos.exception.no_current_sale_exception import NoCurrentSaleException
+from pos.exception.invalid_product_exception import InvalidProductException
+
 # creates a table that stores and displays the product data
 class ProductTable(QtCore.QAbstractTableModel):
     def __init__(self, data):
@@ -458,15 +460,34 @@ class PosGUI(QMainWindow):
         self.cancel_sale_button = QPushButton("Cancel Current Sale")
         self.cancel_sale_button.clicked.connect(self.cancel_sale)
 
-        # Add a back button so you can return to the main menu
+        # add item section
+        self.add_item_label = QLabel("Add Item to Sale:")
+        
+        self.sale_upc_input = QLineEdit()
+        self.sale_upc_input.setPlaceholderText("Enter Product UPC")
+        
+        self.sale_quantity_input = QLineEdit()
+        self.sale_quantity_input.setPlaceholderText("Enter Quantity (e.g., 1 or 2.5)")
+        
+        self.add_item_button = QPushButton("Add Item")
+        self.add_item_button.clicked.connect(self.add_item_to_sale)
+
+        # add a back button so you can return to the main menu
         self.back_button_sale_menu = QPushButton("Back")
         self.back_button_sale_menu.clicked.connect(self.switch_to_main_page)
 
         sale_layout.addWidget(self.sale_status_label)
         sale_layout.addWidget(self.initiate_sale_button)
         sale_layout.addWidget(self.cancel_sale_button)
-        sale_layout.addWidget(self.back_button_sale_menu)
         
+        # add the new inputs to the layout
+        sale_layout.addWidget(self.add_item_label)
+        sale_layout.addWidget(self.sale_upc_input)
+        sale_layout.addWidget(self.sale_quantity_input)
+        sale_layout.addWidget(self.add_item_button)
+
+        sale_layout.addWidget(self.back_button_sale_menu)
+
         self.sale_menu_page.setLayout(sale_layout)
         self.stack_layout.addWidget(self.sale_menu_page)
 
@@ -486,32 +507,60 @@ class PosGUI(QMainWindow):
     def initiate_sale(self):
         try:
             self.controller.initiate_sale()
-            self.sale_status_label.setText("Active Sale: IN PROGRESS")
-            QtWidgets.QMessageBox.information(self, "Success", "New sale initiated successfully!")
-            
+            self.sale_status_label.setText("New sale initiated in progress")
             # Disable the button so they don't click it twice by accident
             self.initiate_sale_button.setEnabled(False) 
             
         except IllegalAccessException:
-            QtWidgets.QMessageBox.warning(self, "Access Denied", "You must be logged in to initiate a sale.")
+            self.sale_status_label.setText("You must be logged in to initiate a sale.")
         except IllegalOperationException:
-            QtWidgets.QMessageBox.warning(self, "Error", "A sale is already in progress. Please finish or cancel it first.")
+            self.sale_status_label.setText("A sale is already in progress. Please finish or cancel it first.")
 
     # cancels the active sale and resets the UI status
     def cancel_sale(self):
         try:
             self.controller.cancel_current_sale()
-            self.sale_status_label.setText("No active sale.")
-            
+            self.sale_status_label.setText("No active sale.")       
             # Re-enable the initiate button so a new sale can be started
             self.initiate_sale_button.setEnabled(True)
-            QtWidgets.QMessageBox.information(self, "Success", "The current sale has been cancelled.")
-            
+
         except IllegalAccessException:
-            QtWidgets.QMessageBox.warning(self, "Access Denied", "You must be logged in to cancel a sale.")
+            self.sale_status_label.setText("You must be logged in to cancel a sale.")
         except NoCurrentSaleException:
-            QtWidgets.QMessageBox.warning(self, "Error", "There is no active sale to cancel.")
+            self.sale_status_label.setText("There is no active sale to cancel.")
+
+    # Adds a product to the active sale
+    def add_item_to_sale(self):
+        upc = self.sale_upc_input.text().strip()
+        quantity_str = self.sale_quantity_input.text().strip()
+
+        if not upc or not quantity_str:
+            self.sale_status_label.setText("Please enter both a UPC and a Quantity.")
+            return
+
+        try:
+            quantity = float(quantity_str)
+
+            if quantity <= 0:
+                raise ValueError()
             
+            self.controller.add_new_sale_line_item(quantity, upc)
+            
+            self.sale_status_label.setText(f"Success: Added item (UPC: {upc}) to the sale.") 
+
+            # Clear inputs for the next item
+            self.sale_upc_input.clear()
+            self.sale_quantity_input.clear()
+            
+        except ValueError:
+            self.sale_status_label.setText("Quantity must be a valid number.")
+        except IllegalAccessException:
+            self.sale_status_label.setText("You must be logged in to add items.")
+        except NoCurrentSaleException:
+            self.sale_status_label.setText("You must initiate a sale before adding items.")
+        except InvalidProductException:
+            self.sale_status_label.setText("Product not found. Please check the UPC.")     
+
 def main():
     app = QApplication(sys.argv)
     window = PosGUI()
