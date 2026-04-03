@@ -34,6 +34,30 @@ class ProductTable(QtCore.QAbstractTableModel):
                 headers = ["UPC", "Product Name", "Price"]
                 return headers[section]
 
+# creates a table that stores and displays the sale data
+class SaleTable(QtCore.QAbstractTableModel):
+    def __init__(self, data):
+        super().__init__()
+        self._data = data
+
+    def data(self, index, role):
+        if role == Qt.ItemDataRole.DisplayRole:
+            return self._data[index.row()][index.column()]
+
+    def rowCount(self, index):
+        return len(self._data)
+        
+    def columnCount(self, index):
+        if len(self._data) == 0:
+            return 0
+        return len(self._data[0])
+
+    def headerData(self, section, orientation, role):
+        if role == Qt.ItemDataRole.DisplayRole:
+            if orientation == Qt.Orientation.Horizontal:
+                headers = ["Sale ID", "Date", "Customer Total"]
+                return headers[section]
+
 class PosGUI(QMainWindow):
 
     def __init__(self):
@@ -56,6 +80,7 @@ class PosGUI(QMainWindow):
         self.setup_update_product_page()
         self.setup_delete_product_page()
         self.setup_sale_menu_page()
+        self.setup_list_sales_page()
 
         container = QWidget()
         container.setLayout(self.stack_layout)
@@ -108,6 +133,9 @@ class PosGUI(QMainWindow):
         self.delete_product_page_button.clicked.connect(self.switch_to_delete_product_page)
         self.sale_menu_page_button = QPushButton("Manage Sales")
         self.sale_menu_page_button.clicked.connect(self.switch_to_sale_menu_page)
+        self.list_sales_page_button = QPushButton("List All Sales")
+        self.list_sales_page_button.clicked.connect(self.switch_to_list_sales_page)
+
         layout = QVBoxLayout()
         layout.addWidget(self.main_message_label)
         layout.addWidget(self.logout_button)
@@ -118,6 +146,7 @@ class PosGUI(QMainWindow):
         layout.addWidget(self.update_product_page_button)
         layout.addWidget(self.delete_product_page_button)
         layout.addWidget(self.sale_menu_page_button)
+        layout.addWidget(self.list_sales_page_button)
 
         self.main_page.setLayout(layout)
         self.stack_layout.addWidget(self.main_page)
@@ -192,6 +221,24 @@ class PosGUI(QMainWindow):
         self.list_products_page.setLayout(layout)
         self.stack_layout.addWidget(self.list_products_page)
 
+    # sets up the sales listing page adding all necessary labels, layout, and table
+    def setup_list_sales_page(self):
+        self.list_sales_page = QWidget()
+
+        self.list_sales_label = QLabel("All Sales")
+        self.sale_table = QtWidgets.QTableView()
+        
+        self.back_button_list_sales = QPushButton("Back")
+        self.back_button_list_sales.clicked.connect(self.switch_to_main_page)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.list_sales_label)
+        layout.addWidget(self.sale_table)
+        layout.addWidget(self.back_button_list_sales)
+
+        self.list_sales_page.setLayout(layout)
+        self.stack_layout.addWidget(self.list_sales_page)
+
     # switches to the main page
     def switch_to_main_page(self):
         self.stack_layout.setCurrentIndex(1)
@@ -248,6 +295,26 @@ class PosGUI(QMainWindow):
         self.sale_status_label.setText("No active sale.")
         self.initiate_sale_button.setEnabled(True)
         self.stack_layout.setCurrentWidget(self.sale_menu_page)
+
+    # switches to the sales listing page and retrieves data from the controller
+    def switch_to_list_sales_page(self):
+        try:
+            sales = self.controller.list_sales()
+
+            list_data = []
+            for sale in sales:
+                # If your Sale class uses different variable names, update them here!
+                # You could also add more fields like the total price if you want.
+                list_data.append([sale.id, sale.date, sale.customer_total])
+
+            self.sale_model = SaleTable(list_data)
+            self.sale_table.setModel(self.sale_model)
+            
+            # Use setCurrentWidget instead of index to avoid stacking order issues
+            self.stack_layout.setCurrentWidget(self.list_sales_page) 
+            
+        except IllegalAccessException:
+            self.main_message_label.setText("You must be logged in to view sales.")
 
     # creates a product using its UPC, description and price. If the price is not a number, throw an exception.
     def create_product(self):
