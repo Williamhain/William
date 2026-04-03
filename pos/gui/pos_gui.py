@@ -203,15 +203,18 @@ class PosGUI(QMainWindow):
 
     # switches to the product listing page
     def switch_to_list_products_page(self):
-        products = self.controller.list_products()
+        try:
+            products = self.controller.list_products()
 
-        list_data = []
-        for product in products:
-            list_data.append([product.upc, product.description, product.price])
+            list_data = []
+            for product in products:
+                list_data.append([product.upc, product.description, product.price])
 
-        self.product_model = ProductTable(list_data)
-        self.product_table.setModel(self.product_model)
-        self.stack_layout.setCurrentIndex(3)
+            self.product_model = ProductTable(list_data)
+            self.product_table.setModel(self.product_model)
+            self.stack_layout.setCurrentIndex(3)
+        except IllegalAccessException:
+            self.main_message_label.setText("You must be logged in to view products.")
 
     # switches to the retrieve products page
     def switch_to_retrieve_products_page(self):
@@ -257,11 +260,15 @@ class PosGUI(QMainWindow):
             self.create_product_details_label.setText("Please input a number for the price")
             return
         
-        self.controller.create_product(upc, description, price)
-        self.create_product_details_label.setText("Product successfully created")
-        self.upc_input.clear()
-        self.description_input.clear()
-        self.price_input.clear()
+        try:
+            self.controller.create_product(upc, description, price)
+            self.create_product_details_label.setText("Product successfully created")
+            self.upc_input.clear()
+            self.description_input.clear()
+            self.price_input.clear()
+
+        except IllegalAccessException:
+            self.create_product_details_label.setText("You must be logged in to create products")
 
     # sets up the retrieve products page, adding all necessary labels, inputs, layout, and the functionality to search for a specific product and press a button to
     # retrieve all matching products as well as go back to the main page
@@ -290,13 +297,17 @@ class PosGUI(QMainWindow):
     # searches for a specific product and if found appends it to the retrieve products list and then presents it as a table
     def retrieve_products(self):
         search = self.retrieve_products_input.text()
-        products = self.controller.retrieve_products(search)
-        retrieve_data = []
-        for product in products:
-            retrieve_data.append([product.upc, product.description, product.price])
+        try:
+            products = self.controller.retrieve_products(search)
+            retrieve_data = []
+            for product in products:
+                retrieve_data.append([product.upc, product.description, product.price])
 
-        self.retrieve_product_model = ProductTable(retrieve_data)
-        self.retrieve_products_table.setModel(self.retrieve_product_model)
+            self.retrieve_product_model = ProductTable(retrieve_data)
+            self.retrieve_products_table.setModel(self.retrieve_product_model)
+
+        except IllegalAccessException:
+            self.retrieve_product_description.setText("You must be logged in to retrieve products")
 
     # sets up the search product page, adding all necessary labels, inputs, layout, and the functionality to search for a product by its corresponding UPC code
     # and press a button to return to the main page
@@ -327,14 +338,17 @@ class PosGUI(QMainWindow):
     # searches for a specific product via its UPC code and if found appends it to the search data list and then presents it as a table
     def search_product(self):
         upc = self.search_product_input.text()
-        product = self.controller.search_product(upc)
+        try:
+            product = self.controller.search_product(upc)
+            search_data = []
+            if product is not None:
+                search_data.append([product.upc, product.description, product.price])
 
-        search_data = []
-        if product is not None:
-            search_data.append([product.upc, product.description, product.price])
+            self.search_product_model = ProductTable(search_data)
+            self.search_product_table.setModel(self.search_product_model)
 
-        self.search_product_model = ProductTable(search_data)
-        self.search_product_table.setModel(self.search_product_model)
+        except IllegalAccessException:
+            self.search_product_description.setText("You must be logged in to serach product")
 
     # sets up the update product page, adding all necessary labels, inputs, layout, and the functionality to update a product's name
     # price, and/or UPC code and a back button to be able to return to the main page
@@ -378,7 +392,10 @@ class PosGUI(QMainWindow):
         except IllegalOperationException:
             self.update_product_description.setText("Product does not exist")
             return
-
+        except IllegalAccessException:
+            self.update_product_description.setText("You must be logged in")
+            return
+        
         if product is None:
             self.update_product_description.setText("Product does not exist")
             return
@@ -422,6 +439,8 @@ class PosGUI(QMainWindow):
             self.updated_price_input.clear()
         except IllegalOperationException:
             self.update_product_description.setText("This upc is already in use by product")
+        except IllegalAccessException:
+            self.update_product_description.setText("You must be logged in")
 
     # sets up the delete product page, adding all necessary labels, inputs, layout, and the functionality to delete a product via its UPC
     # code and a button to be able to return to the main page
@@ -472,6 +491,10 @@ class PosGUI(QMainWindow):
         self.add_item_button = QPushButton("Add Item")
         self.add_item_button.clicked.connect(self.add_item_to_sale)
 
+        # Finish Sale Button
+        self.finish_sale_button = QPushButton("Finish Current Sale")
+        self.finish_sale_button.clicked.connect(self.finish_sale)
+
         # receipt display area
         self.receipt_display = QPlainTextEdit()
         self.receipt_display.setReadOnly(True) 
@@ -490,8 +513,8 @@ class PosGUI(QMainWindow):
         sale_layout.addWidget(self.sale_upc_input)
         sale_layout.addWidget(self.sale_quantity_input)
         sale_layout.addWidget(self.add_item_button)
+        sale_layout.addWidget(self.finish_sale_button)
         sale_layout.addWidget(self.receipt_display)
-
         sale_layout.addWidget(self.back_button_sale_menu)
 
         self.sale_menu_page.setLayout(sale_layout)
@@ -508,6 +531,8 @@ class PosGUI(QMainWindow):
 
         except IllegalOperationException:
             self.delete_product_description.setText("Specified product does not exist")
+        except IllegalAccessException:
+            self.delete_product_description.setText("You must be logged in")
 
     # Initiates a new sale and handles exceptions
     def initiate_sale(self):
@@ -557,7 +582,7 @@ class PosGUI(QMainWindow):
             if current_items:
                 self.receipt_display.setPlainText(current_items)
 
-            self.sale_status_label.setText(f"Success: Added item (UPC: {upc}) to the sale.") 
+            self.sale_status_label.setText(f"Added item (UPC: {upc}) to the sale.") 
 
             # Clear inputs for the next item
             self.sale_upc_input.clear()
@@ -571,6 +596,23 @@ class PosGUI(QMainWindow):
             self.sale_status_label.setText("You must initiate a sale before adding items.")
         except InvalidProductException:
             self.sale_status_label.setText("Product not found. Please check the UPC.")     
+
+    # Finishes the current sale and displays the final receipt
+    def finish_sale(self):
+        try:
+            finished_sale = self.controller.finish_current_sale()
+            
+            # Display the final receipt
+            self.receipt_display.setPlainText(finished_sale.get_sale_receipt())
+            self.sale_status_label.setText("The sale has been concluded!")
+            self.initiate_sale_button.setEnabled(True)
+            
+        except NoCurrentSaleException:
+            self.sale_status_label.setText("There is no active sale to finish.")
+        except IllegalOperationException:
+            self.sale_status_label.setText("Cannot finish a sale with no items.")
+        except IllegalAccessException:
+            self.sale_status_label.setText("You must be logged in to finish a sale.")
 
 def main():
     app = QApplication(sys.argv)
