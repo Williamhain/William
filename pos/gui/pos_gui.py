@@ -2,7 +2,7 @@ import sys
 from pos.configuration import Configuration
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QLineEdit, QPushButton, QWidget, QStackedLayout, QVBoxLayout
+from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QLineEdit, QPushButton, QWidget, QStackedLayout, QVBoxLayout, QPlainTextEdit
 from pos.controller import Controller
 from pos.exception.invalid_logout_exception import InvalidLogoutException
 from pos.exception.invalid_login_exception import InvalidLoginException
@@ -472,6 +472,11 @@ class PosGUI(QMainWindow):
         self.add_item_button = QPushButton("Add Item")
         self.add_item_button.clicked.connect(self.add_item_to_sale)
 
+        # receipt display area
+        self.receipt_display = QPlainTextEdit()
+        self.receipt_display.setReadOnly(True) 
+        self.receipt_display.setPlaceholderText("Items added to the current sale will appear here")
+
         # add a back button so you can return to the main menu
         self.back_button_sale_menu = QPushButton("Back")
         self.back_button_sale_menu.clicked.connect(self.switch_to_main_page)
@@ -485,6 +490,7 @@ class PosGUI(QMainWindow):
         sale_layout.addWidget(self.sale_upc_input)
         sale_layout.addWidget(self.sale_quantity_input)
         sale_layout.addWidget(self.add_item_button)
+        sale_layout.addWidget(self.receipt_display)
 
         sale_layout.addWidget(self.back_button_sale_menu)
 
@@ -508,9 +514,9 @@ class PosGUI(QMainWindow):
         try:
             self.controller.initiate_sale()
             self.sale_status_label.setText("New sale initiated in progress")
-            # Disable the button so they don't click it twice by accident
-            self.initiate_sale_button.setEnabled(False) 
-            
+            self.initiate_sale_button.setEnabled(False) # Disable the button so they don't click it twice by accident
+            self.receipt_display.clear() # Clear receipt for the new sale
+
         except IllegalAccessException:
             self.sale_status_label.setText("You must be logged in to initiate a sale.")
         except IllegalOperationException:
@@ -521,8 +527,8 @@ class PosGUI(QMainWindow):
         try:
             self.controller.cancel_current_sale()
             self.sale_status_label.setText("No active sale.")       
-            # Re-enable the initiate button so a new sale can be started
-            self.initiate_sale_button.setEnabled(True)
+            self.initiate_sale_button.setEnabled(True) # re-enable the initiate button so a new sale can be started
+            self.receipt_display.clear() # Clear the cancelled items
 
         except IllegalAccessException:
             self.sale_status_label.setText("You must be logged in to cancel a sale.")
@@ -546,6 +552,11 @@ class PosGUI(QMainWindow):
             
             self.controller.add_new_sale_line_item(quantity, upc)
             
+            # Fetch updated items and display them
+            current_items = self.controller.print_sale_line_items()
+            if current_items:
+                self.receipt_display.setPlainText(current_items)
+
             self.sale_status_label.setText(f"Success: Added item (UPC: {upc}) to the sale.") 
 
             # Clear inputs for the next item
