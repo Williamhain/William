@@ -89,6 +89,10 @@ class PosGUI(QMainWindow):
         self.setCentralWidget(container)
         self.stack_layout.setCurrentIndex(0)
 
+
+
+
+
     # sets up the login page, adding all necessary labels, inputs, layout, and the functionality to log in using a button
     def setup_login_page(self):
         self.login_page = QWidget()
@@ -113,6 +117,32 @@ class PosGUI(QMainWindow):
 
         self.login_page.setLayout(layout)
         self.stack_layout.addWidget(self.login_page)
+
+    # Handles the users login attempts and displays appropriate messages if log in is successful or not
+    def login(self):
+        username = self.username_input.text()
+        password = self.password_input.text()
+
+        try:
+            self.controller.login(username, password)
+            self.login_message_label.setText("Login Successful!")
+            self.username_input.clear()
+            self.password_input.clear()
+            self.stack_layout.setCurrentIndex(1)
+
+        except InvalidLoginException:
+            self.login_message_label.setText("Login incorrect")
+
+    # Logs the user out, re prompts the log in message, then returns to the login page
+    def logout(self):
+     
+        self.controller.logout()
+        self.login_message_label.setText("POS System\n\nPlease enter your log in details")
+        self.stack_layout.setCurrentIndex(0)
+
+
+
+
 
     # sets up the main page after logging in and creates logout button
     def setup_main_page(self):
@@ -159,27 +189,13 @@ class PosGUI(QMainWindow):
         self.main_page.setLayout(layout)
         self.stack_layout.addWidget(self.main_page)
 
-    # Handles the users login attempts and displays appropriate messages if log in is successful or not
-    def login(self):
-        username = self.username_input.text()
-        password = self.password_input.text()
+    # switches to the main page
+    def switch_to_main_page(self):
+        self.stack_layout.setCurrentIndex(1)
 
-        try:
-            self.controller.login(username, password)
-            self.login_message_label.setText("Login Successful!")
-            self.username_input.clear()
-            self.password_input.clear()
-            self.stack_layout.setCurrentIndex(1)
 
-        except InvalidLoginException:
-            self.login_message_label.setText("Login incorrect")
 
-    # Logs the user out, re prompts the log in message, then returns to the login page
-    def logout(self):
-     
-        self.controller.logout()
-        self.login_message_label.setText("POS System\n\nPlease enter your log in details")
-        self.stack_layout.setCurrentIndex(0)
+
 
     # sets up the product page, adding all necessary labels, inputs, layout, and the functionality to create a new product and add
     # its description, price and UPC code. 
@@ -211,163 +227,10 @@ class PosGUI(QMainWindow):
         self.create_product_page.setLayout(layout)
         self.stack_layout.addWidget(self.create_product_page)
 
-    # sets up the product listing page adding all necessary labels, inputs, layout, and the functionality to list all products
-    # and be able to return to the previous page. 
-    def setup_list_products_page(self):
-        self.list_products_page = QWidget()
-
-        self.list_products_label = QLabel("All Products")
-        self.product_table = QtWidgets.QTableView()
-        self.back_button_list_products = QPushButton("Back")
-        self.back_button_list_products.clicked.connect(self.switch_to_main_page)
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.list_products_label)
-        layout.addWidget(self.product_table)
-        layout.addWidget(self.back_button_list_products)
-
-        self.list_products_page.setLayout(layout)
-        self.stack_layout.addWidget(self.list_products_page)
-
-    # sets up the sales listing page adding all necessary labels, layout, and table
-    def setup_list_sales_page(self):
-        self.list_sales_page = QWidget()
-
-        self.list_sales_label = QLabel("All Sales")
-        self.sale_table = QtWidgets.QTableView()
-        
-        self.back_button_list_sales = QPushButton("Back")
-        self.back_button_list_sales.clicked.connect(self.switch_to_main_page)
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.list_sales_label)
-        layout.addWidget(self.sale_table)
-        layout.addWidget(self.back_button_list_sales)
-
-        self.list_sales_page.setLayout(layout)
-        self.stack_layout.addWidget(self.list_sales_page)
-
-    # sets up the search sale page, adding labels, inputs, layout, and functionality to search for a sale by ID
-    def setup_search_sale_page(self):
-        self.search_sale_page = QWidget()
-
-        self.search_sale_description = QLabel("Please enter a Sale ID to search for a specific transaction")
-        
-        self.search_sale_input = QLineEdit()
-        self.search_sale_input.setPlaceholderText("Sale ID")
-        
-        self.search_sale_button = QPushButton("Search for Sale")
-        self.search_sale_button.clicked.connect(self.search_sale)
-
-        self.search_sale_table = QtWidgets.QTableView()
-
-        self.back_button_search_sale = QPushButton("Back")
-        self.back_button_search_sale.clicked.connect(self.switch_to_main_page)
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.search_sale_description)
-        layout.addWidget(self.search_sale_input)
-        layout.addWidget(self.search_sale_button)
-        layout.addWidget(self.search_sale_table)
-        layout.addWidget(self.back_button_search_sale)
-
-        self.search_sale_page.setLayout(layout)
-        self.stack_layout.addWidget(self.search_sale_page)
-
-    # switches to the main page
-    def switch_to_main_page(self):
-        self.stack_layout.setCurrentIndex(1)
-
     # switches to the create a product page
     def switch_to_create_product_page(self):
         self.create_product_details_label.setText("Please enter new product details")
         self.stack_layout.setCurrentIndex(2)
-
-    # switches to the product listing page
-    def switch_to_list_products_page(self):
-        try:
-            products = self.controller.list_products()
-
-            list_data = []
-            for product in products:
-                list_data.append([product.upc, product.description, product.price])
-
-            self.product_model = ProductTable(list_data)
-            self.product_table.setModel(self.product_model)
-            self.stack_layout.setCurrentIndex(3)
-        except IllegalAccessException:
-            self.main_message_label.setText("You must be logged in to view products.")
-
-    # switches to the retrieve products page
-    def switch_to_retrieve_products_page(self):
-        self.retrieve_products_input.clear()
-        self.retrieve_product_description.setText("Please enter a product name to search for a specific product")
-        self.stack_layout.setCurrentIndex(4)
-
-    # switches to the search product page
-    def switch_to_search_product_page(self):
-        self.search_product_input.clear()
-        self.search_product_description.setText("Please enter a UPC code to search for a specific product")
-        self.stack_layout.setCurrentIndex(5)
-
-    # switches to the update product page
-    def switch_to_update_product_page(self):
-        self.original_upc_input.clear()
-        self.updated_upc_input.clear()
-        self.updated_description_input.clear()
-        self.updated_price_input.clear()
-        self.update_product_description.setText("Please enter the original UPC code of the product to be updated and enter the desired changes")
-        self.stack_layout.setCurrentIndex(6)
-
-    # switches to the delete product page
-    def switch_to_delete_product_page(self):
-        self.delete_product_input.clear()
-        self.delete_product_description.setText("Please enter the UPC code of the product you wish to remove")
-        self.stack_layout.setCurrentIndex(7)
-    
-    # swtiches to the sale menu page
-    def switch_to_sale_menu_page(self):
-        self.sale_status_label.setText("No active sale.")
-        self.initiate_sale_button.setEnabled(True)
-        self.stack_layout.setCurrentWidget(self.sale_menu_page)
-
-    # switches to the sales listing page and retrieves data from the controller
-    def switch_to_list_sales_page(self):
-        try:
-            sales = self.controller.list_sales()
-
-            list_data = []
-            for sale in sales:
-                # If your Sale class uses different variable names, update them here!
-                # You could also add more fields like the total price if you want.
-                list_data.append([sale.id, sale.date, sale.customer_total])
-
-            self.sale_model = SaleTable(list_data)
-            self.sale_table.setModel(self.sale_model)
-            
-            # Use setCurrentWidget instead of index to avoid stacking order issues
-            self.stack_layout.setCurrentWidget(self.list_sales_page) 
-            
-        except IllegalAccessException:
-            self.main_message_label.setText("You must be logged in to view sales.")
-
-    # switches to the search sale page and clears previous inputs
-    def switch_to_search_sale_page(self):
-        self.search_sale_input.clear()
-        self.search_sale_description.setText("Please enter a Sale ID to search for a specific transaction")
-        
-        # Clear the table so old searches don't linger
-        empty_model = SaleTable([])
-        self.search_sale_table.setModel(empty_model)
-        
-        self.stack_layout.setCurrentWidget(self.search_sale_page)
-
-    # switches to the receipt retrieval page and clears old data
-    def switch_to_retrieve_sale_receipt_page(self):
-        self.retrieve_receipt_input.clear()
-        self.retrieve_receipt_display.clear()
-        self.retrieve_receipt_label.setText("Enter a Sale ID to retrieve its receipt")
-        self.stack_layout.setCurrentWidget(self.retrieve_receipt_page)
 
     # creates a product using its UPC, description and price. If the price is not a number, throw an exception.
     def create_product(self):
@@ -394,6 +257,47 @@ class PosGUI(QMainWindow):
         except IllegalAccessException:
             self.create_product_details_label.setText("You must be logged in to create products")
 
+
+
+
+
+    # sets up the product listing page adding all necessary labels, inputs, layout, and the functionality to list all products
+    # and be able to return to the previous page. 
+    def setup_list_products_page(self):
+        self.list_products_page = QWidget()
+
+        self.list_products_label = QLabel("All Products")
+        self.product_table = QtWidgets.QTableView()
+        self.back_button_list_products = QPushButton("Back")
+        self.back_button_list_products.clicked.connect(self.switch_to_main_page)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.list_products_label)
+        layout.addWidget(self.product_table)
+        layout.addWidget(self.back_button_list_products)
+
+        self.list_products_page.setLayout(layout)
+        self.stack_layout.addWidget(self.list_products_page)
+
+    # switches to the product listing page
+    def switch_to_list_products_page(self):
+        try:
+            products = self.controller.list_products()
+
+            list_data = []
+            for product in products:
+                list_data.append([product.upc, product.description, product.price])
+
+            self.product_model = ProductTable(list_data)
+            self.product_table.setModel(self.product_model)
+            self.stack_layout.setCurrentIndex(3)
+        except IllegalAccessException:
+            self.main_message_label.setText("You must be logged in to view products.")
+
+
+
+
+
     # sets up the retrieve products page, adding all necessary labels, inputs, layout, and the functionality to search for a specific product and press a button to
     # retrieve all matching products as well as go back to the main page
     def setup_retrieve_products_page(self):
@@ -418,6 +322,12 @@ class PosGUI(QMainWindow):
         self.retrieve_products_page.setLayout(layout)
         self.stack_layout.addWidget(self.retrieve_products_page)
 
+    # switches to the retrieve products page
+    def switch_to_retrieve_products_page(self):
+        self.retrieve_products_input.clear()
+        self.retrieve_product_description.setText("Please enter a product name to search for a specific product")
+        self.stack_layout.setCurrentIndex(4)
+
     # searches for a specific product and if found appends it to the retrieve products list and then presents it as a table
     def retrieve_products(self):
         search = self.retrieve_products_input.text()
@@ -432,6 +342,10 @@ class PosGUI(QMainWindow):
 
         except IllegalAccessException:
             self.retrieve_product_description.setText("You must be logged in to retrieve products")
+
+
+
+
 
     # sets up the search product page, adding all necessary labels, inputs, layout, and the functionality to search for a product by its corresponding UPC code
     # and press a button to return to the main page
@@ -459,6 +373,12 @@ class PosGUI(QMainWindow):
         self.search_product_page.setLayout(layout)
         self.stack_layout.addWidget(self.search_product_page)
 
+    # switches to the search product page
+    def switch_to_search_product_page(self):
+        self.search_product_input.clear()
+        self.search_product_description.setText("Please enter a UPC code to search for a specific product")
+        self.stack_layout.setCurrentIndex(5)
+
     # searches for a specific product via its UPC code and if found appends it to the search data list and then presents it as a table
     def search_product(self):
         upc = self.search_product_input.text()
@@ -473,6 +393,10 @@ class PosGUI(QMainWindow):
 
         except IllegalAccessException:
             self.search_product_description.setText("You must be logged in to serach product")
+
+
+
+
 
     # sets up the update product page, adding all necessary labels, inputs, layout, and the functionality to update a product's name
     # price, and/or UPC code and a back button to be able to return to the main page
@@ -504,6 +428,15 @@ class PosGUI(QMainWindow):
 
         self.update_product_page.setLayout(layout)
         self.stack_layout.addWidget(self.update_product_page)
+
+    # switches to the update product page
+    def switch_to_update_product_page(self):
+        self.original_upc_input.clear()
+        self.updated_upc_input.clear()
+        self.updated_description_input.clear()
+        self.updated_price_input.clear()
+        self.update_product_description.setText("Please enter the original UPC code of the product to be updated and enter the desired changes")
+        self.stack_layout.setCurrentIndex(6)
 
     # updates a product by allowing user to input the original UPC code of the product that they wish to update
     # and then modifying either the UPC code, price, or product name as desired. Does not allow negative numbers for prices
@@ -566,6 +499,10 @@ class PosGUI(QMainWindow):
         except IllegalAccessException:
             self.update_product_description.setText("You must be logged in")
 
+
+
+
+
     # sets up the delete product page, adding all necessary labels, inputs, layout, and the functionality to delete a product via its UPC
     # code and a button to be able to return to the main page
     def setup_delete_product_page(self):
@@ -587,6 +524,30 @@ class PosGUI(QMainWindow):
 
         self.delete_product_page.setLayout(layout)
         self.stack_layout.addWidget(self.delete_product_page)
+
+    # switches to the delete product page
+    def switch_to_delete_product_page(self):
+        self.delete_product_input.clear()
+        self.delete_product_description.setText("Please enter the UPC code of the product you wish to remove")
+        self.stack_layout.setCurrentIndex(7)
+
+    # deletes a product via its UPC code and throw an exception if the product does not exist
+    def delete_product(self):
+        upc = self.delete_product_input.text()
+
+        try:
+            self.controller.delete_product(upc)
+            self.delete_product_description.setText("Product removed successfully")
+            self.delete_product_input.clear()
+
+        except IllegalOperationException:
+            self.delete_product_description.setText("Specified product does not exist")
+        except IllegalAccessException:
+            self.delete_product_description.setText("You must be logged in")
+
+
+
+
 
     # sets up the sale menu page, including labels for sale status, 
     # buttons to initiate a new sale, and navigation to return to the main menu.
@@ -644,47 +605,11 @@ class PosGUI(QMainWindow):
         self.sale_menu_page.setLayout(sale_layout)
         self.stack_layout.addWidget(self.sale_menu_page)
 
-    # sets up the page to retrieve and display a past sale receipt
-    def setup_retrieve_sale_receipt_page(self):
-        self.retrieve_receipt_page = QWidget()
-        
-        self.retrieve_receipt_label = QLabel("Enter a Sale ID to retrieve its receipt")
-        self.retrieve_receipt_input = QLineEdit()
-        self.retrieve_receipt_input.setPlaceholderText("Sale ID")
-        
-        self.retrieve_receipt_button = QPushButton("Retrieve Receipt")
-        self.retrieve_receipt_button.clicked.connect(self.retrieve_sale_receipt)
-        
-        self.retrieve_receipt_display = QPlainTextEdit()
-        self.retrieve_receipt_display.setReadOnly(True)
-        self.retrieve_receipt_display.setPlaceholderText("The receipt will appear here")
-        
-        self.back_button_retrieve_receipt = QPushButton("Back")
-        self.back_button_retrieve_receipt.clicked.connect(self.switch_to_main_page)
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.retrieve_receipt_label)
-        layout.addWidget(self.retrieve_receipt_input)
-        layout.addWidget(self.retrieve_receipt_button)
-        layout.addWidget(self.retrieve_receipt_display)
-        layout.addWidget(self.back_button_retrieve_receipt)
-
-        self.retrieve_receipt_page.setLayout(layout)
-        self.stack_layout.addWidget(self.retrieve_receipt_page)
-
-    # deletes a product via its UPC code and throw an exception if the product does not exist
-    def delete_product(self):
-        upc = self.delete_product_input.text()
-
-        try:
-            self.controller.delete_product(upc)
-            self.delete_product_description.setText("Product removed successfully")
-            self.delete_product_input.clear()
-
-        except IllegalOperationException:
-            self.delete_product_description.setText("Specified product does not exist")
-        except IllegalAccessException:
-            self.delete_product_description.setText("You must be logged in")
+    # swtiches to the sale menu page
+    def switch_to_sale_menu_page(self):
+        self.sale_status_label.setText("No active sale.")
+        self.initiate_sale_button.setEnabled(True)
+        self.stack_layout.setCurrentIndex(8)
 
     # Initiates a new sale and handles exceptions
     def initiate_sale(self):
@@ -766,6 +691,86 @@ class PosGUI(QMainWindow):
         except IllegalAccessException:
             self.sale_status_label.setText("You must be logged in to finish a sale.")
 
+
+
+
+
+    # sets up the sales listing page adding all necessary labels, layout, and table
+    def setup_list_sales_page(self):
+        self.list_sales_page = QWidget()
+
+        self.list_sales_label = QLabel("All Sales")
+        self.sale_table = QtWidgets.QTableView()
+        
+        self.back_button_list_sales = QPushButton("Back")
+        self.back_button_list_sales.clicked.connect(self.switch_to_main_page)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.list_sales_label)
+        layout.addWidget(self.sale_table)
+        layout.addWidget(self.back_button_list_sales)
+
+        self.list_sales_page.setLayout(layout)
+        self.stack_layout.addWidget(self.list_sales_page)
+
+    # switches to the sales listing page and retrieves data from the controller
+    def switch_to_list_sales_page(self):
+        try:
+            sales = self.controller.list_sales()
+
+            list_data = []
+            for sale in sales:
+                list_data.append([sale.id, sale.date, sale.customer_total])
+
+            self.sale_model = SaleTable(list_data)
+            self.sale_table.setModel(self.sale_model)            
+            self.stack_layout.setCurrentIndex(9) 
+            
+        except IllegalAccessException:
+            self.main_message_label.setText("You must be logged in to view sales.")
+
+
+
+
+
+    # sets up the search sale page, adding labels, inputs, layout, and functionality to search for a sale by ID
+    def setup_search_sale_page(self):
+        self.search_sale_page = QWidget()
+
+        self.search_sale_description = QLabel("Please enter a Sale ID to search for a specific transaction")
+        
+        self.search_sale_input = QLineEdit()
+        self.search_sale_input.setPlaceholderText("Sale ID")
+        
+        self.search_sale_button = QPushButton("Search for Sale")
+        self.search_sale_button.clicked.connect(self.search_sale)
+
+        self.search_sale_table = QtWidgets.QTableView()
+
+        self.back_button_search_sale = QPushButton("Back")
+        self.back_button_search_sale.clicked.connect(self.switch_to_main_page)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.search_sale_description)
+        layout.addWidget(self.search_sale_input)
+        layout.addWidget(self.search_sale_button)
+        layout.addWidget(self.search_sale_table)
+        layout.addWidget(self.back_button_search_sale)
+
+        self.search_sale_page.setLayout(layout)
+        self.stack_layout.addWidget(self.search_sale_page)
+
+    # switches to the search sale page and clears previous inputs
+    def switch_to_search_sale_page(self):
+        self.search_sale_input.clear()
+        self.search_sale_description.setText("Please enter a Sale ID to search for a specific transaction")
+        
+        # Clear the table so old searches don't linger
+        empty_model = SaleTable([])
+        self.search_sale_table.setModel(empty_model)
+        
+        self.stack_layout.setCurrentIndex(10)
+
     # searches for a specific sale via its ID and presents it in the table
     def search_sale(self):
         sale_id_str = self.search_sale_input.text().strip()
@@ -775,7 +780,6 @@ class PosGUI(QMainWindow):
             return
 
         try:
-            # Depending on how the controller is written, ID might need to be an int
             try:
                 sale_id = int(sale_id_str)
             except ValueError:
@@ -785,7 +789,6 @@ class PosGUI(QMainWindow):
             
             search_data = []
             if sale is not None:
-                # Using the exact variables we verified: id, date, customer_total
                 search_data.append([sale.id, sale.date, sale.customer_total])
                 self.search_sale_description.setText(f"Found Sale ID {sale_id}")
             else:
@@ -798,6 +801,45 @@ class PosGUI(QMainWindow):
             self.search_sale_description.setText("You must be logged in to search sales.")
         except Exception as e:
             self.search_sale_description.setText(f"Error occurred during search: {e}")
+
+
+
+
+
+    # sets up the page to retrieve and display a past sale receipt
+    def setup_retrieve_sale_receipt_page(self):
+        self.retrieve_receipt_page = QWidget()
+        
+        self.retrieve_receipt_label = QLabel("Enter a Sale ID to retrieve its receipt")
+        self.retrieve_receipt_input = QLineEdit()
+        self.retrieve_receipt_input.setPlaceholderText("Sale ID")
+        
+        self.retrieve_receipt_button = QPushButton("Retrieve Receipt")
+        self.retrieve_receipt_button.clicked.connect(self.retrieve_sale_receipt)
+        
+        self.retrieve_receipt_display = QPlainTextEdit()
+        self.retrieve_receipt_display.setReadOnly(True)
+        self.retrieve_receipt_display.setPlaceholderText("The receipt will appear here")
+        
+        self.back_button_retrieve_receipt = QPushButton("Back")
+        self.back_button_retrieve_receipt.clicked.connect(self.switch_to_main_page)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.retrieve_receipt_label)
+        layout.addWidget(self.retrieve_receipt_input)
+        layout.addWidget(self.retrieve_receipt_button)
+        layout.addWidget(self.retrieve_receipt_display)
+        layout.addWidget(self.back_button_retrieve_receipt)
+
+        self.retrieve_receipt_page.setLayout(layout)
+        self.stack_layout.addWidget(self.retrieve_receipt_page)
+
+    # switches to the receipt retrieval page and clears old data
+    def switch_to_retrieve_sale_receipt_page(self):
+        self.retrieve_receipt_input.clear()
+        self.retrieve_receipt_display.clear()
+        self.retrieve_receipt_label.setText("Enter a Sale ID to retrieve its receipt")
+        self.stack_layout.setCurrentIndex(11)
 
     # Searches for a sale and prints its receipt to the text box
     def retrieve_sale_receipt(self):
@@ -835,6 +877,10 @@ class PosGUI(QMainWindow):
             self.retrieve_receipt_label.setText("You must be logged in to retrieve receipts.")
         except Exception as e:
             self.retrieve_receipt_label.setText(f"Error occurred: {e}")
+
+
+
+
 
 def main():
     app = QApplication(sys.argv)
