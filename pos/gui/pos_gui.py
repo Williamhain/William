@@ -82,6 +82,7 @@ class PosGUI(QMainWindow):
         self.setup_sale_menu_page()
         self.setup_list_sales_page()
         self.setup_search_sale_page()
+        self.setup_retrieve_sale_receipt_page()
 
         container = QWidget()
         container.setLayout(self.stack_layout)
@@ -138,6 +139,8 @@ class PosGUI(QMainWindow):
         self.list_sales_page_button.clicked.connect(self.switch_to_list_sales_page)
         self.search_sale_page_button = QPushButton("Search Sale by ID")
         self.search_sale_page_button.clicked.connect(self.switch_to_search_sale_page)
+        self.retrieve_receipt_page_button = QPushButton("Retrieve Sale Receipt")
+        self.retrieve_receipt_page_button.clicked.connect(self.switch_to_retrieve_sale_receipt_page)
 
         layout = QVBoxLayout()
         layout.addWidget(self.main_message_label)
@@ -151,6 +154,7 @@ class PosGUI(QMainWindow):
         layout.addWidget(self.sale_menu_page_button)
         layout.addWidget(self.list_sales_page_button)
         layout.addWidget(self.search_sale_page_button)
+        layout.addWidget(self.retrieve_receipt_page_button)
 
         self.main_page.setLayout(layout)
         self.stack_layout.addWidget(self.main_page)
@@ -358,6 +362,13 @@ class PosGUI(QMainWindow):
         
         self.stack_layout.setCurrentWidget(self.search_sale_page)
 
+    # switches to the receipt retrieval page and clears old data
+    def switch_to_retrieve_sale_receipt_page(self):
+        self.retrieve_receipt_input.clear()
+        self.retrieve_receipt_display.clear()
+        self.retrieve_receipt_label.setText("Enter a Sale ID to retrieve its receipt")
+        self.stack_layout.setCurrentWidget(self.retrieve_receipt_page)
+
     # creates a product using its UPC, description and price. If the price is not a number, throw an exception.
     def create_product(self):
         upc = self.upc_input.text()
@@ -365,6 +376,10 @@ class PosGUI(QMainWindow):
 
         try:
             price = float(self.price_input.text())
+            if price < 0:
+                self.create_product_details_label.setText("Price cannot be negative")
+                return
+            
         except ValueError:
             self.create_product_details_label.setText("Please input a number for the price")
             return
@@ -629,6 +644,34 @@ class PosGUI(QMainWindow):
         self.sale_menu_page.setLayout(sale_layout)
         self.stack_layout.addWidget(self.sale_menu_page)
 
+    # sets up the page to retrieve and display a past sale receipt
+    def setup_retrieve_sale_receipt_page(self):
+        self.retrieve_receipt_page = QWidget()
+        
+        self.retrieve_receipt_label = QLabel("Enter a Sale ID to retrieve its receipt")
+        self.retrieve_receipt_input = QLineEdit()
+        self.retrieve_receipt_input.setPlaceholderText("Sale ID")
+        
+        self.retrieve_receipt_button = QPushButton("Retrieve Receipt")
+        self.retrieve_receipt_button.clicked.connect(self.retrieve_sale_receipt)
+        
+        self.retrieve_receipt_display = QPlainTextEdit()
+        self.retrieve_receipt_display.setReadOnly(True)
+        self.retrieve_receipt_display.setPlaceholderText("The receipt will appear here")
+        
+        self.back_button_retrieve_receipt = QPushButton("Back")
+        self.back_button_retrieve_receipt.clicked.connect(self.switch_to_main_page)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.retrieve_receipt_label)
+        layout.addWidget(self.retrieve_receipt_input)
+        layout.addWidget(self.retrieve_receipt_button)
+        layout.addWidget(self.retrieve_receipt_display)
+        layout.addWidget(self.back_button_retrieve_receipt)
+
+        self.retrieve_receipt_page.setLayout(layout)
+        self.stack_layout.addWidget(self.retrieve_receipt_page)
+
     # deletes a product via its UPC code and throw an exception if the product does not exist
     def delete_product(self):
         upc = self.delete_product_input.text()
@@ -755,6 +798,43 @@ class PosGUI(QMainWindow):
             self.search_sale_description.setText("You must be logged in to search sales.")
         except Exception as e:
             self.search_sale_description.setText(f"Error occurred during search: {e}")
+
+    # Searches for a sale and prints its receipt to the text box
+    def retrieve_sale_receipt(self):
+        sale_id_str = self.retrieve_receipt_input.text().strip()
+        
+        if not sale_id_str:
+            self.retrieve_receipt_label.setText("Please enter a Sale ID.")
+            return
+
+        try:
+            try:
+                sale_id = int(sale_id_str)
+            except ValueError:
+                sale_id = sale_id_str
+
+            sale = self.controller.search_sale(sale_id)
+            
+            if sale is not None:
+                # get the receipt string from the object
+                if hasattr(sale, 'sale_receipt'):
+                    receipt_text = sale.sale_receipt 
+                else:
+                    sale.get_sale_receipt()
+                
+                if receipt_text:
+                    self.retrieve_receipt_display.setPlainText(receipt_text)
+                    self.retrieve_receipt_label.setText(f"Retrieved receipt for Sale ID {sale_id}")
+                else:
+                    self.retrieve_receipt_display.setPlainText("Receipt data is empty for this sale.")
+            else:
+                self.retrieve_receipt_display.clear()
+                self.retrieve_receipt_label.setText(f"No sale found with ID {sale_id}")
+                
+        except IllegalAccessException:
+            self.retrieve_receipt_label.setText("You must be logged in to retrieve receipts.")
+        except Exception as e:
+            self.retrieve_receipt_label.setText(f"Error occurred: {e}")
 
 def main():
     app = QApplication(sys.argv)
