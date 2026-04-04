@@ -81,6 +81,7 @@ class PosGUI(QMainWindow):
         self.setup_delete_product_page()
         self.setup_sale_menu_page()
         self.setup_list_sales_page()
+        self.setup_search_sale_page()
 
         container = QWidget()
         container.setLayout(self.stack_layout)
@@ -135,6 +136,8 @@ class PosGUI(QMainWindow):
         self.sale_menu_page_button.clicked.connect(self.switch_to_sale_menu_page)
         self.list_sales_page_button = QPushButton("List All Sales")
         self.list_sales_page_button.clicked.connect(self.switch_to_list_sales_page)
+        self.search_sale_page_button = QPushButton("Search Sale by ID")
+        self.search_sale_page_button.clicked.connect(self.switch_to_search_sale_page)
 
         layout = QVBoxLayout()
         layout.addWidget(self.main_message_label)
@@ -147,6 +150,7 @@ class PosGUI(QMainWindow):
         layout.addWidget(self.delete_product_page_button)
         layout.addWidget(self.sale_menu_page_button)
         layout.addWidget(self.list_sales_page_button)
+        layout.addWidget(self.search_sale_page_button)
 
         self.main_page.setLayout(layout)
         self.stack_layout.addWidget(self.main_page)
@@ -239,6 +243,33 @@ class PosGUI(QMainWindow):
         self.list_sales_page.setLayout(layout)
         self.stack_layout.addWidget(self.list_sales_page)
 
+    # sets up the search sale page, adding labels, inputs, layout, and functionality to search for a sale by ID
+    def setup_search_sale_page(self):
+        self.search_sale_page = QWidget()
+
+        self.search_sale_description = QLabel("Please enter a Sale ID to search for a specific transaction")
+        
+        self.search_sale_input = QLineEdit()
+        self.search_sale_input.setPlaceholderText("Sale ID")
+        
+        self.search_sale_button = QPushButton("Search for Sale")
+        self.search_sale_button.clicked.connect(self.search_sale)
+
+        self.search_sale_table = QtWidgets.QTableView()
+
+        self.back_button_search_sale = QPushButton("Back")
+        self.back_button_search_sale.clicked.connect(self.switch_to_main_page)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.search_sale_description)
+        layout.addWidget(self.search_sale_input)
+        layout.addWidget(self.search_sale_button)
+        layout.addWidget(self.search_sale_table)
+        layout.addWidget(self.back_button_search_sale)
+
+        self.search_sale_page.setLayout(layout)
+        self.stack_layout.addWidget(self.search_sale_page)
+
     # switches to the main page
     def switch_to_main_page(self):
         self.stack_layout.setCurrentIndex(1)
@@ -315,6 +346,17 @@ class PosGUI(QMainWindow):
             
         except IllegalAccessException:
             self.main_message_label.setText("You must be logged in to view sales.")
+
+    # switches to the search sale page and clears previous inputs
+    def switch_to_search_sale_page(self):
+        self.search_sale_input.clear()
+        self.search_sale_description.setText("Please enter a Sale ID to search for a specific transaction")
+        
+        # Clear the table so old searches don't linger
+        empty_model = SaleTable([])
+        self.search_sale_table.setModel(empty_model)
+        
+        self.stack_layout.setCurrentWidget(self.search_sale_page)
 
     # creates a product using its UPC, description and price. If the price is not a number, throw an exception.
     def create_product(self):
@@ -680,6 +722,39 @@ class PosGUI(QMainWindow):
             self.sale_status_label.setText("Cannot finish a sale with no items.")
         except IllegalAccessException:
             self.sale_status_label.setText("You must be logged in to finish a sale.")
+
+    # searches for a specific sale via its ID and presents it in the table
+    def search_sale(self):
+        sale_id_str = self.search_sale_input.text().strip()
+        
+        if not sale_id_str:
+            self.search_sale_description.setText("Please enter a Sale ID.")
+            return
+
+        try:
+            # Depending on how the controller is written, ID might need to be an int
+            try:
+                sale_id = int(sale_id_str)
+            except ValueError:
+                sale_id = sale_id_str # Fallback to string if IDs are alphanumeric
+
+            sale = self.controller.search_sale(sale_id)
+            
+            search_data = []
+            if sale is not None:
+                # Using the exact variables we verified: id, date, customer_total
+                search_data.append([sale.id, sale.date, sale.customer_total])
+                self.search_sale_description.setText(f"Found Sale ID {sale_id}")
+            else:
+                self.search_sale_description.setText(f"No sale found with ID {sale_id}")
+
+            self.search_sale_model = SaleTable(search_data)
+            self.search_sale_table.setModel(self.search_sale_model)
+            
+        except IllegalAccessException:
+            self.search_sale_description.setText("You must be logged in to search sales.")
+        except Exception as e:
+            self.search_sale_description.setText(f"Error occurred during search: {e}")
 
 def main():
     app = QApplication(sys.argv)
