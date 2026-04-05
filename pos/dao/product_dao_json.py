@@ -45,8 +45,12 @@ class ProductDAOJSON(ProductDAO):
 
 	def retrieve_products(self, search_string):
 		retrieved_products = []
+		# convert search term to lowercase and remove spaces
+		search_lower = search_string.strip().lower()
+
 		for product in self.products.values():
-			if search_string in product.description:
+			# startswith() ensures we only match from the beginning, not the middle
+			if product.description.lower().startswith(search_lower):
 				retrieved_products.append(product)
 		return retrieved_products
 

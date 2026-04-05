@@ -1,7 +1,6 @@
 import sys
 from pos.configuration import Configuration
-from PyQt6 import QtCore, QtWidgets
-from PyQt6.QtCore import Qt
+from PyQt6 import QtWidgets
 from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QLineEdit, QPushButton, QWidget, QStackedLayout, QVBoxLayout, QPlainTextEdit
 from pos.controller import Controller
 from pos.exception.invalid_logout_exception import InvalidLogoutException
@@ -10,53 +9,9 @@ from pos.exception.illegal_operation_exception import IllegalOperationException
 from pos.exception.illegal_access_exception import IllegalAccessException
 from pos.exception.no_current_sale_exception import NoCurrentSaleException
 from pos.exception.invalid_product_exception import InvalidProductException
+from pos.gui.tables import ProductTable
+from pos.gui.tables import SaleTable
 
-# creates a table that stores and displays the product data
-class ProductTable(QtCore.QAbstractTableModel):
-    def __init__(self, data):
-        super().__init__()
-        self._data = data
-
-    def data(self, index, role):
-        if role == Qt.ItemDataRole.DisplayRole:
-            return self._data[index.row()][index.column()]
-
-    def rowCount(self, index):
-        return len(self._data)
-    def columnCount(self, index):
-        if len(self._data) == 0:
-            return 0
-        return len(self._data[0])
-
-    def headerData(self, section, orientation, role):
-        if role == Qt.ItemDataRole.DisplayRole:
-            if orientation == Qt.Orientation.Horizontal:
-                headers = ["UPC", "Product Name", "Price"]
-                return headers[section]
-
-# creates a table that stores and displays the sale data
-class SaleTable(QtCore.QAbstractTableModel):
-    def __init__(self, data):
-        super().__init__()
-        self._data = data
-
-    def data(self, index, role):
-        if role == Qt.ItemDataRole.DisplayRole:
-            return self._data[index.row()][index.column()]
-
-    def rowCount(self, index):
-        return len(self._data)
-        
-    def columnCount(self, index):
-        if len(self._data) == 0:
-            return 0
-        return len(self._data[0])
-
-    def headerData(self, section, orientation, role):
-        if role == Qt.ItemDataRole.DisplayRole:
-            if orientation == Qt.Orientation.Horizontal:
-                headers = ["Sale ID", "Date", "Customer Total"]
-                return headers[section]
 
 class PosGUI(QMainWindow):
 
@@ -236,9 +191,24 @@ class PosGUI(QMainWindow):
     def create_product(self):
         upc = self.upc_input.text()
         description = self.description_input.text()
+        price_text = self.price_input.text().strip()
+
+        # check if upc and product name are blank
+        if not upc or not description:
+            self.create_product_details_label.setText("UPC and Product Name cannot be blank")
+            return
+
+        # ensure UPC is exactly 12 numeric digits
+        if len(upc) != 12 or not upc.isdigit():
+            self.create_product_details_label.setText("UPC must be exactly 12 digits (numbers only)")
+            return
 
         try:
-            price = float(self.price_input.text())
+            if "." in price_text and len(price_text.split(".")[1]) > 2:
+                self.create_product_details_label.setText("Price can have at most 2 decimal places")
+                return
+
+            price = float(price_text)
             if price < 0:
                 self.create_product_details_label.setText("Price cannot be negative")
                 return
@@ -256,7 +226,8 @@ class PosGUI(QMainWindow):
 
         except IllegalAccessException:
             self.create_product_details_label.setText("You must be logged in to create products")
-
+        except IllegalOperationException:
+            self.create_product_details_label.setText("A product with this UPC already exists")
 
 
 
@@ -286,7 +257,8 @@ class PosGUI(QMainWindow):
 
             list_data = []
             for product in products:
-                list_data.append([product.upc, product.description, product.price])
+                formatted_price = f"{product.price:.2f}"
+                list_data.append([product.upc, product.description, formatted_price])
 
             self.product_model = ProductTable(list_data)
             self.product_table.setModel(self.product_model)
@@ -330,15 +302,26 @@ class PosGUI(QMainWindow):
 
     # searches for a specific product and if found appends it to the retrieve products list and then presents it as a table
     def retrieve_products(self):
-        search = self.retrieve_products_input.text()
+        search = self.retrieve_products_input.text().strip().lower()
+
+        if not search:
+            self.retrieve_product_description.setText("Please enter a product name to search.")
+            return
+        
         try:
             products = self.controller.retrieve_products(search)
+            
             retrieve_data = []
             for product in products:
                 retrieve_data.append([product.upc, product.description, product.price])
 
             self.retrieve_product_model = ProductTable(retrieve_data)
             self.retrieve_products_table.setModel(self.retrieve_product_model)
+
+            if not retrieve_data:
+                self.retrieve_product_description.setText(f"No products found starting with '{search}'")
+            else:
+                self.retrieve_product_description.setText(f"Found {len(retrieve_data)} matching product(s)")
 
         except IllegalAccessException:
             self.retrieve_product_description.setText("You must be logged in to retrieve products")
@@ -382,11 +365,27 @@ class PosGUI(QMainWindow):
     # searches for a specific product via its UPC code and if found appends it to the search data list and then presents it as a table
     def search_product(self):
         upc = self.search_product_input.text()
+
+        # check if the upc is blank
+        if not upc:
+            self.search_product_description.setText("Please enter a UPC code.")
+            return
+
+        # check if the UPC is exactly 12 digits (numeric only)
+        if len(upc) != 12 or not upc.isdigit():
+            self.search_product_description.setText("UPC must be exactly 12 digits (numbers only).")
+            return
+        
         try:
             product = self.controller.search_product(upc)
             search_data = []
+
             if product is not None:
                 search_data.append([product.upc, product.description, product.price])
+                self.search_product_description.setText(f"Found: {product.description}")
+
+            else:
+                self.search_product_description.setText("Product not found.")
 
             self.search_product_model = ProductTable(search_data)
             self.search_product_table.setModel(self.search_product_model)
@@ -442,7 +441,11 @@ class PosGUI(QMainWindow):
     # and then modifying either the UPC code, price, or product name as desired. Does not allow negative numbers for prices
     # and only allows up to 2 decimal places. 
     def update_product(self):
-        original_upc = self.original_upc_input.text()
+        original_upc = self.original_upc_input.text().strip()
+
+        if not original_upc:
+            self.update_product_description.setText("Please enter the old UPC.")
+            return
 
         try:
             product = self.controller.search_product(original_upc)
@@ -457,31 +460,36 @@ class PosGUI(QMainWindow):
             self.update_product_description.setText("Product does not exist")
             return
 
-        updated_upc = self.updated_upc_input.text()
-        updated_description = self.updated_description_input.text()
-        updated_price_text = self.updated_price_input.text()
+        updated_upc = self.updated_upc_input.text().strip()
+        updated_description = self.updated_description_input.text().strip()
+        updated_price_text = self.updated_price_input.text().strip()
 
-        if updated_upc == "":
+        if not updated_upc:
             updated_upc = product.upc
 
-        if updated_description == "":
+        else:
+            # If the user provided a new upc, check that it is exactly 12 digits
+            if len(updated_upc) != 12 or not updated_upc.isdigit():
+                self.update_product_description.setText("New UPC must be exactly 12 digits.")
+                return 
+
+        if not updated_description:
             updated_description = product.description
 
-        if updated_price_text == "":
+        if not updated_price_text:
             updated_price = product.price
+
         else:
-            try:
+            try:     
+                if "." in updated_price_text and len(updated_price_text.split(".")[1]) > 2:
+                    self.update_product_description.setText("Price can have at most 2 decimal places")
+                    return
+
                 updated_price = float(updated_price_text)
 
                 if updated_price < 0:
                     self.update_product_description.setText("Price cannot be negative")
                     return
-
-                if "." in updated_price_text:
-                    decimal_part = updated_price_text.split(".")[1]
-                    if len(decimal_part) > 2:
-                        self.update_product_description.setText("Price can have at most 2 decimal places")
-                        return
 
             except ValueError:
                 self.update_product_description.setText("Please input a valid number for the price")
@@ -541,7 +549,7 @@ class PosGUI(QMainWindow):
             self.delete_product_input.clear()
 
         except IllegalOperationException:
-            self.delete_product_description.setText("Specified product does not exist")
+            self.delete_product_description.setText("Product does not exist")
         except IllegalAccessException:
             self.delete_product_description.setText("You must be logged in")
 
@@ -858,11 +866,7 @@ class PosGUI(QMainWindow):
             sale = self.controller.search_sale(sale_id)
             
             if sale is not None:
-                # get the receipt string from the object
-                if hasattr(sale, 'sale_receipt'):
-                    receipt_text = sale.sale_receipt 
-                else:
-                    sale.get_sale_receipt()
+                receipt_text = sale.get_sale_receipt()
                 
                 if receipt_text:
                     self.retrieve_receipt_display.setPlainText(receipt_text)

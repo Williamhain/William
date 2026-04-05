@@ -189,7 +189,7 @@ class Sale():
 
 		retrieved_sale_line_items = []
 		for sale_line_item in self.sale_line_items:
-			if search_string in sale_line_item.title or search_string in sale_line_item.text:
+			if search_string in sale_line_item.upc:
 				retrieved_sale_line_items.append(sale_line_item)
 		return retrieved_sale_line_items
 
